@@ -1,0 +1,1561 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NodeKeeper · vista previa liquid glass</title>
+<link rel="stylesheet" href="src/styles/tokens.css"><link rel="stylesheet" href="src/styles/global.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head><body><div id="root"></div><script type="text/babel" data-presets="react">
+try {
+const { useState, useEffect } = React;
+const __mk=(n)=>(p={})=>React.createElement("svg",{width:p.size||18,height:p.size||18,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:p.strokeWidth||2,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("rect",{x:5,y:5,width:14,height:14,rx:3}));
+const LayoutDashboard=__mk("LayoutDashboard");
+const Share2=__mk("Share2");
+const Server=__mk("Server");
+const Wrench=__mk("Wrench");
+const CalendarDays=__mk("CalendarDays");
+const MapIcon=__mk("MapIcon");
+const ImageIcon=__mk("ImageIcon");
+const BarChart3=__mk("BarChart3");
+const Users=__mk("Users");
+const Settings=__mk("Settings");
+const Menu=__mk("Menu");
+const Search=__mk("Search");
+const Plus=__mk("Plus");
+const Bell=__mk("Bell");
+const LogOut=__mk("LogOut");
+const Download=__mk("Download");
+const Repeat=__mk("Repeat");
+const Lock=__mk("Lock");
+const CheckCircle2=__mk("CheckCircle2");
+const Paperclip=__mk("Paperclip");
+const Check=__mk("Check");
+const UploadCloud=__mk("UploadCloud");
+const FileText=__mk("FileText");
+const ArrowLeft=__mk("ArrowLeft");
+const ArrowRight=__mk("ArrowRight");
+const MapPin=__mk("MapPin");
+const Pencil=__mk("Pencil");
+const ChevronRight=__mk("ChevronRight");
+const ChevronLeft=__mk("ChevronLeft");
+const SlidersHorizontal=__mk("SlidersHorizontal");
+const List=__mk("List");
+const Eye=__mk("Eye");
+const Printer=__mk("Printer");
+const UserPlus=__mk("UserPlus");
+const MoreHorizontal=__mk("MoreHorizontal");
+const HardHat=__mk("HardHat");
+const Shield=__mk("Shield");
+const AlertCircle=__mk("AlertCircle");
+const SearchX=__mk("SearchX");
+const Circle=__mk("Circle");
+/* NodeKeeper · Coopelesca — datos mock (es-CR). Sin datos reales/sensibles.
+   Contexto: Zona Norte, cantón de San Carlos, Costa Rica.
+   Toda la app es visual: estos datos sustituyen a cualquier backend.
+   `DATA` = entidades · `NK` = helpers de estado/color + cálculo de avance. */
+
+const DATA = {
+  nodes: [
+    { id: 'n1', code: 'NODE-001', name: 'Subestación Ciudad Quesada', city: 'San Carlos', locality: 'Quesada',      health: 'red',   pending: 3, equip: 8,  x: 30, y: 22 },
+    { id: 'n2', code: 'NODE-014', name: 'Nodo Aguas Zarcas',          city: 'San Carlos', locality: 'Aguas Zarcas', health: 'amber', pending: 0, equip: 5,  x: 52, y: 40 },
+    { id: 'n3', code: 'NODE-027', name: 'Repetidora Cerro Chato',     city: 'San Carlos', locality: 'La Fortuna',   health: 'green', pending: 0, equip: 3,  x: 68, y: 30 },
+    { id: 'n4', code: 'NODE-008', name: 'Nodo Industrial Florencia',  city: 'San Carlos', locality: 'Florencia',    health: 'red',   pending: 2, equip: 11, x: 40, y: 64 },
+    { id: 'n5', code: 'NODE-019', name: 'Subestación Pital',          city: 'San Carlos', locality: 'Pital',        health: 'green', pending: 0, equip: 6,  x: 58, y: 18 },
+    { id: 'n6', code: 'NODE-033', name: 'Nodo Venecia',               city: 'San Carlos', locality: 'Venecia',      health: 'amber', pending: 0, equip: 7,  x: 74, y: 58 },
+    { id: 'n7', code: 'NODE-005', name: 'Repetidora Muelle',          city: 'San Carlos', locality: 'Muelle',       health: 'green', pending: 0, equip: 4,  x: 22, y: 50 },
+    { id: 'n8', code: 'NODE-041', name: 'Nodo Río Cuarto',            city: 'Grecia',     locality: 'Río Cuarto',   health: 'amber', pending: 0, equip: 9,  x: 84, y: 38 },
+  ],
+
+  equipment: [
+    // NODE-001 · Subestación Ciudad Quesada
+    { id: 'e1',  nodeId: 'n1', code: 'EQ-118', name: 'Switch core',         type: 'Red',        status: 'operativo' },
+    { id: 'e2',  nodeId: 'n1', code: 'EQ-204', name: 'UPS 6kVA',            type: 'Energía',    status: 'alerta' },
+    { id: 'e3',  nodeId: 'n1', code: 'EQ-119', name: 'Aire acondicionado',  type: 'Clima',      status: 'operativo' },
+    { id: 'e4',  nodeId: 'n1', code: 'EQ-120', name: 'Rack principal',      type: 'Estructura', status: 'operativo' },
+    { id: 'e5',  nodeId: 'n1', code: 'EQ-331', name: 'Generador diésel',    type: 'Energía',    status: 'falla' },
+    // NODE-008 · Nodo Industrial Florencia
+    { id: 'e6',  nodeId: 'n4', code: 'EQ-405', name: 'Generador diésel',    type: 'Energía',    status: 'falla' },
+    { id: 'e7',  nodeId: 'n4', code: 'EQ-406', name: 'Transformador 75kVA', type: 'Energía',    status: 'operativo' },
+    { id: 'e8',  nodeId: 'n4', code: 'EQ-407', name: 'Switch distribución', type: 'Red',        status: 'alerta' },
+    // NODE-014 · Nodo Aguas Zarcas
+    { id: 'e9',  nodeId: 'n2', code: 'EQ-210', name: 'UPS 3kVA',            type: 'Energía',    status: 'operativo' },
+    { id: 'e10', nodeId: 'n2', code: 'EQ-211', name: 'Router perimetral',   type: 'Red',        status: 'operativo' },
+    // NODE-019 · Subestación Pital
+    { id: 'e11', nodeId: 'n5', code: 'EQ-150', name: 'UPS 6kVA',            type: 'Energía',    status: 'operativo' },
+    { id: 'e12', nodeId: 'n5', code: 'EQ-151', name: 'Climatización rack',  type: 'Clima',      status: 'operativo' },
+  ],
+
+  maint: [
+    { id: 'm1', code: 'MNT-2041', nodeId: 'n1', node: 'Subestación Ciudad Quesada', type: 'preventivo', state: 'progreso',  resp: 'Adriana Vargas', date: '2026-06-04', equip: 'Switch core',     recurring: true,  priority: 'alta',  exec: 'interno',
+      tasks: [
+        { label: 'Inspección visual del gabinete', done: true },
+        { label: 'Limpieza de filtros de ventilación', done: true },
+        { label: 'Verificación de conexiones de energía', done: true },
+        { label: 'Medición de voltaje de entrada', done: false },
+        { label: 'Prueba de respaldo UPS', done: false },
+        { label: 'Registro de temperatura', done: false },
+      ] },
+    { id: 'm2', code: 'MNT-2038', nodeId: 'n4', node: 'Nodo Industrial Florencia',  type: 'correctivo', state: 'pendiente', resp: 'José Alvarado',  date: '2026-06-05', equip: 'Generador diésel', recurring: false, priority: 'alta',  exec: 'terceros',
+      tasks: [{ label: 'Diagnóstico de falla', done: false }, { label: 'Solicitud de repuesto', done: false }] },
+    { id: 'm3', code: 'MNT-2033', nodeId: 'n3', node: 'Repetidora Cerro Chato',     type: 'preventivo', state: 'cerrado',   resp: 'Karla Méndez',   date: '2026-05-28', equip: '—',               recurring: true,  priority: 'media', exec: 'interno',
+      tasks: [
+        { label: 'Revisión de cableado estructurado', done: true },
+        { label: 'Actualización de firmware switch', done: true },
+        { label: 'Limpieza general del rack', done: true },
+        { label: 'Prueba de continuidad', done: true },
+      ] },
+    { id: 'm4', code: 'MNT-2029', nodeId: 'n2', node: 'Nodo Aguas Zarcas',          type: 'preventivo', state: 'progreso',  resp: 'José Alvarado',  date: '2026-06-06', equip: '—',               recurring: true,  priority: 'media', exec: 'interno',
+      tasks: [{ label: 'Inspección visual', done: true }, { label: 'Limpieza', done: false }, { label: 'Pruebas', done: false }] },
+    { id: 'm5', code: 'MNT-2025', nodeId: 'n5', node: 'Subestación Pital',          type: 'correctivo', state: 'cerrado',   resp: 'Adriana Vargas', date: '2026-05-22', equip: 'UPS 6kVA',         recurring: false, priority: 'baja',  exec: 'terceros',
+      tasks: [
+        { label: 'Revisión de cableado estructurado', done: true },
+        { label: 'Reemplazo de batería', done: true },
+        { label: 'Prueba de carga', done: true },
+        { label: 'Cierre de orden', done: true },
+      ] },
+    { id: 'm6', code: 'MNT-2019', nodeId: 'n6', node: 'Nodo Venecia',               type: 'preventivo', state: 'pendiente', resp: 'Greivin Salas',  date: '2026-06-09', equip: '—',               recurring: true,  priority: 'media', exec: 'interno',
+      tasks: [{ label: 'Inspección', done: false }] },
+  ],
+
+  evidence: [
+    { id: 'v1', name: 'gabinete-frontal.jpg', kind: 'image', size: '2.4 MB', date: '2026-06-04 09:32', by: 'A. Vargas' },
+    { id: 'v2', name: 'medicion-voltaje.jpg', kind: 'image', size: '1.8 MB', date: '2026-06-04 10:05', by: 'A. Vargas' },
+    { id: 'v3', name: 'reporte-ups.pdf',      kind: 'doc',   size: '320 KB', date: '2026-06-04 10:21', by: 'A. Vargas' },
+    { id: 'v4', name: 'filtros-limpieza.jpg', kind: 'image', size: '2.1 MB', date: '2026-06-04 09:48', by: 'J. Alvarado' },
+  ],
+
+  users: [
+    { id: 'u1', name: 'Adriana Vargas', email: 'a.vargas@coopelesca.cr',  role: 'Administrador', status: 'activo',   last: 'hace 5 min',  initials: 'AV', color: 'var(--blue-600)' },
+    { id: 'u2', name: 'José Alvarado',  email: 'j.alvarado@coopelesca.cr', role: 'Operador',      status: 'activo',   last: 'hace 1 h',    initials: 'JA', color: 'var(--green-600)' },
+    { id: 'u3', name: 'Karla Méndez',   email: 'k.mendez@coopelesca.cr',   role: 'Operador',      status: 'activo',   last: 'ayer',        initials: 'KM', color: 'var(--amber-500)' },
+    { id: 'u4', name: 'Greivin Salas',  email: 'g.salas@coopelesca.cr',    role: 'Operador',      status: 'inactivo', last: 'hace 8 días', initials: 'GS', color: 'var(--navy-600)' },
+    { id: 'u5', name: 'Mauricio Solís', email: 'm.solis@coopelesca.cr',    role: 'Administrador', status: 'activo',   last: 'hace 30 min', initials: 'MS', color: 'var(--red-600)' },
+  ],
+
+  kpis: [
+    { key: 'pendientes', label: 'Pendientes',   value: 18,  accent: 'var(--red-600)',   fg: 'var(--red-700)',   delta: '▲ 4 esta semana', deltaColor: 'var(--red-700)' },
+    { key: 'progreso',   label: 'En ejecución', value: 9,   accent: 'var(--amber-500)', fg: 'var(--amber-700)', delta: '2 vencen hoy',     deltaColor: 'var(--fg-3)' },
+    { key: 'cerrados',   label: 'Cerrados',     value: 146, accent: 'var(--green-600)', fg: 'var(--green-700)', delta: '▲ 11 este mes',   deltaColor: 'var(--green-700)' },
+    { key: 'preventivo', label: 'Preventivos',  value: 31,  accent: 'var(--blue-600)',  fg: 'var(--blue-700)',  delta: '7 recurrentes',    deltaColor: 'var(--fg-3)' },
+    { key: 'correctivo', label: 'Correctivos',  value: 12,  accent: 'var(--navy-600)',  fg: 'var(--navy-700)',  delta: '4 abiertos',       deltaColor: 'var(--fg-3)' },
+  ],
+
+  // Actividad de las últimas 8 semanas (cerrados: preventivo vs correctivo)
+  trend: [
+    { w: 'S1', prev: 7, corr: 2 }, { w: 'S2', prev: 11, corr: 4 }, { w: 'S3', prev: 8, corr: 3 },
+    { w: 'S4', prev: 13, corr: 5 }, { w: 'S5', prev: 10, corr: 3 }, { w: 'S6', prev: 15, corr: 2 },
+    { w: 'S7', prev: 12, corr: 6 }, { w: 'S8', prev: 16, corr: 4 },
+  ],
+
+  // Eventos del calendario (junio 2026). `day` = día del mes.
+  calendar: [
+    { day: 2,  code: 'MNT-2050', node: 'Subestación Pital',          type: 'preventivo', state: 'cerrado' },
+    { day: 4,  code: 'MNT-2041', node: 'Subestación Ciudad Quesada', type: 'preventivo', state: 'progreso' },
+    { day: 5,  code: 'MNT-2038', node: 'Nodo Industrial Florencia',  type: 'correctivo', state: 'pendiente' },
+    { day: 6,  code: 'MNT-2029', node: 'Nodo Aguas Zarcas',          type: 'preventivo', state: 'progreso' },
+    { day: 9,  code: 'MNT-2019', node: 'Nodo Venecia',               type: 'preventivo', state: 'pendiente' },
+    { day: 9,  code: 'MNT-2061', node: 'Nodo Río Cuarto',            type: 'correctivo', state: 'pendiente' },
+    { day: 12, code: 'MNT-2044', node: 'Repetidora Muelle',          type: 'preventivo', state: 'cerrado' },
+    { day: 16, code: 'MNT-2070', node: 'Subestación Ciudad Quesada', type: 'preventivo', state: 'pendiente' },
+    { day: 18, code: 'MNT-2072', node: 'Nodo Industrial Florencia',  type: 'correctivo', state: 'progreso' },
+    { day: 23, code: 'MNT-2081', node: 'Repetidora Cerro Chato',     type: 'preventivo', state: 'pendiente' },
+    { day: 24, code: 'MNT-2055', node: 'Subestación Pital',          type: 'preventivo', state: 'pendiente' },
+    { day: 30, code: 'MNT-2090', node: 'Nodo Venecia',               type: 'preventivo', state: 'pendiente' },
+  ],
+};
+
+/* Helpers de estado/color y cálculo de avance del checklist.
+   El color es siempre dirigido por datos — no se codifican hex en las pantallas. */
+const NK = {
+  health: {
+    green: { fg: 'var(--green-700)', bg: 'var(--green-50)', solid: 'var(--green-600)', label: 'Sin pendientes' },
+    amber: { fg: 'var(--amber-700)', bg: 'var(--amber-50)', solid: 'var(--amber-500)', label: 'Tareas incompletas' },
+    red:   { fg: 'var(--red-700)',   bg: 'var(--red-50)',   solid: 'var(--red-600)',   label: 'Pendientes' },
+  },
+  state: {
+    pendiente: { fg: 'var(--red-700)',   bg: 'var(--red-50)',   solid: 'var(--red-600)',   label: 'Pendiente' },
+    progreso:  { fg: 'var(--amber-700)', bg: 'var(--amber-50)', solid: 'var(--amber-500)', label: 'En progreso' },
+    cerrado:   { fg: 'var(--green-700)', bg: 'var(--green-50)', solid: 'var(--green-600)', label: 'Cerrado' },
+  },
+  equipStatus: {
+    operativo: { fg: 'var(--green-700)', bg: 'var(--green-50)', solid: 'var(--green-600)', label: 'Operativo' },
+    alerta:    { fg: 'var(--amber-700)', bg: 'var(--amber-50)', solid: 'var(--amber-500)', label: 'Alerta' },
+    falla:     { fg: 'var(--red-700)',   bg: 'var(--red-50)',   solid: 'var(--red-600)',   label: 'Falla' },
+  },
+  // Porcentaje de avance del checklist (regla: solo se cierra al 100%).
+  pct: (tasks) => Math.round((100 * tasks.filter((t) => t.done).length) / tasks.length),
+};
+
+/* Icono basado en lucide-react + marcas de NodeKeeper (Logo / Mark).
+   El kit usa nombres kebab ('layout-dashboard'); aquí los mapeamos a los
+   componentes de lucide-react (import explícito → tree-shakeable). El wrapper
+   .ic permite que el color del nav activo cascadee al trazo del SVG. */
+
+const ICONS = {
+  'layout-dashboard': LayoutDashboard, 'share-2': Share2, server: Server, wrench: Wrench,
+  'calendar-days': CalendarDays, map: MapIcon, image: ImageIcon, 'bar-chart-3': BarChart3,
+  users: Users, settings: Settings, menu: Menu, search: Search, plus: Plus, bell: Bell,
+  'log-out': LogOut, download: Download, repeat: Repeat, lock: Lock, 'check-circle-2': CheckCircle2,
+  paperclip: Paperclip, check: Check, 'upload-cloud': UploadCloud, 'file-text': FileText,
+  'arrow-left': ArrowLeft, 'arrow-right': ArrowRight, 'map-pin': MapPin, pencil: Pencil,
+  'chevron-right': ChevronRight, 'chevron-left': ChevronLeft, 'sliders-horizontal': SlidersHorizontal,
+  list: List, eye: Eye, printer: Printer, 'user-plus': UserPlus, 'more-horizontal': MoreHorizontal,
+  'hard-hat': HardHat, shield: Shield, 'alert-circle': AlertCircle, 'search-x': SearchX,
+};
+
+function Icon({ name, size = 18, stroke = 2, style, className = '' }) {
+  const Cmp = ICONS[name] || Circle;
+  return (
+    <span className={`ic ${className}`} style={style}>
+      <Cmp size={size} strokeWidth={stroke} />
+    </span>
+  );
+}
+
+function Mark({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NodeKeeper" style={{ display: 'block' }}>
+      <rect width="44" height="44" rx="10" fill="#0F2440" />
+      <rect x="0.5" y="0.5" width="43" height="43" rx="9.5" stroke="#FFFFFF" strokeOpacity="0.06" />
+      <g stroke="#3B7DE0" strokeWidth="2" strokeLinecap="round">
+        <line x1="22" y1="22" x2="13" y2="13" /><line x1="22" y1="22" x2="31" y2="13" />
+        <line x1="22" y1="22" x2="13" y2="31" /><line x1="22" y1="22" x2="31" y2="31" />
+      </g>
+      <circle cx="13" cy="13" r="3.4" fill="#2563C9" /><circle cx="31" cy="13" r="3.4" fill="#2563C9" />
+      <circle cx="13" cy="31" r="3.4" fill="#2563C9" /><circle cx="31" cy="31" r="3.4" fill="#22A862" />
+      <circle cx="22" cy="22" r="5.2" fill="#FFFFFF" /><circle cx="22" cy="22" r="2.2" fill="#0F2440" />
+    </svg>
+  );
+}
+
+function Logo({ height = 28, variant = 'dark' }) {
+  const dark = variant === 'dark';
+  return (
+    <svg height={height} width={height * (208 / 44)} viewBox="0 0 208 44" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NodeKeeper" style={{ display: 'block' }}>
+      <rect width="44" height="44" rx="10" fill={dark ? '#FFFFFF' : '#0F2440'} fillOpacity={dark ? 0.06 : 1} />
+      {dark && <rect x="0.5" y="0.5" width="43" height="43" rx="9.5" stroke="#FFFFFF" strokeOpacity="0.12" />}
+      <g stroke="#3B7DE0" strokeWidth="2" strokeLinecap="round">
+        <line x1="22" y1="22" x2="13" y2="13" /><line x1="22" y1="22" x2="31" y2="13" />
+        <line x1="22" y1="22" x2="13" y2="31" /><line x1="22" y1="22" x2="31" y2="31" />
+      </g>
+      <circle cx="13" cy="13" r="3.4" fill={dark ? '#6BA0EC' : '#2563C9'} /><circle cx="31" cy="13" r="3.4" fill={dark ? '#6BA0EC' : '#2563C9'} />
+      <circle cx="13" cy="31" r="3.4" fill={dark ? '#6BA0EC' : '#2563C9'} /><circle cx="31" cy="31" r="3.4" fill="#22A862" />
+      <circle cx="22" cy="22" r="5.2" fill="#FFFFFF" /><circle cx="22" cy="22" r="2.2" fill="#0F2440" />
+      <text x="56" y="29" fontFamily="'Nunito', sans-serif" fontSize="22" fontWeight="700" letterSpacing="-0.01em" fill={dark ? '#FFFFFF' : '#0F2440'}>Node<tspan fill={dark ? '#6BA0EC' : '#2563C9'}>Keeper</tspan></text>
+    </svg>
+  );
+}
+
+/* Card (superficie blanca con borde hairline) y ProgressBar (avance del checklist). */
+
+function Card({ children, className = '', style, pad = true }) {
+  return <div className={`nk-card ${pad ? 'nk-card-pad' : ''} ${className}`} style={style}>{children}</div>;
+}
+
+function ProgressBar({ value, color }) {
+  const c = color || (value >= 100 ? 'var(--green-600)' : value > 0 ? 'var(--amber-500)' : 'var(--gray-300)');
+  return (
+    <div className="nk-track"><div className="nk-fill" style={{ width: value + '%', background: c }}></div></div>
+  );
+}
+
+/* Botones del Design System. Variantes: primary · secondary · ghost · danger · subtle. */
+
+function Button({ children, variant = 'primary', size = 'md', icon, iconRight, onClick, type = 'button', disabled, style }) {
+  return (
+    <button type={type} className={`nk-btn nk-btn-${variant} nk-btn-${size}`} onClick={onClick} disabled={disabled} style={style}>
+      {icon && <Icon name={icon} size={size === 'sm' ? 15 : 16} />}
+      {children && <span>{children}</span>}
+      {iconRight && <Icon name={iconRight} size={size === 'sm' ? 15 : 16} />}
+    </button>
+  );
+}
+
+function IconButton({ name, onClick, title, active, style }) {
+  return (
+    <button type="button" className={`nk-iconbtn ${active ? 'is-active' : ''}`} onClick={onClick} title={title} style={style}>
+      <Icon name={name} size={17} />
+    </button>
+  );
+}
+
+/* Badges / pills no-estado: tipo de mantenimiento, prioridad, rol y un Badge genérico. */
+
+function TypePill({ type }) {
+  const map = {
+    preventivo: { bg: 'var(--blue-50)', fg: 'var(--blue-700)', label: 'Preventivo' },
+    correctivo: { bg: 'var(--gray-100)', fg: 'var(--gray-600)', label: 'Correctivo' },
+  };
+  const s = map[type] || map.preventivo;
+  return <span className="nk-pill" style={{ background: s.bg, color: s.fg }}>{s.label}</span>;
+}
+
+function PriorityPill({ p }) {
+  const map = {
+    alta: { bg: 'var(--red-50)', fg: 'var(--red-700)' },
+    media: { bg: 'var(--amber-50)', fg: 'var(--amber-700)' },
+    baja: { bg: 'var(--gray-100)', fg: 'var(--gray-600)' },
+  };
+  const s = map[p] || map.media;
+  return <span className="nk-pill" style={{ background: s.bg, color: s.fg, textTransform: 'capitalize' }}>{p}</span>;
+}
+
+function RolePill({ role }) {
+  const admin = role === 'Administrador' || role === 'admin';
+  return (
+    <span className="nk-pill" style={{ background: admin ? 'var(--blue-50)' : 'var(--gray-100)', color: admin ? 'var(--blue-700)' : 'var(--gray-600)' }}>
+      {role === 'admin' ? 'Administrador' : role === 'operator' ? 'Operador' : role}
+    </span>
+  );
+}
+
+// Badge genérico (texto + colores opcionales).
+function Badge({ children, bg = 'var(--gray-100)', fg = 'var(--gray-600)', dot }) {
+  return (
+    <span className="nk-pill" style={{ background: bg, color: fg }}>
+      {dot && <span className="nk-dot" style={{ background: dot }}></span>}
+      {children}
+    </span>
+  );
+}
+
+/* Estado por color (semáforo). StatusPill acepta una clave de estado
+   ('pendiente'|'progreso'|'cerrado') o un objeto {fg,bg,solid,label}. */
+
+function StatusPill({ state, label, solid = false }) {
+  const s = typeof state === 'object' ? state : NK.state[state];
+  if (!s) return null;
+  const text = label || s.label;
+  if (solid) return <span className="nk-pill" style={{ background: s.solid, color: '#fff' }}>{text}</span>;
+  return (
+    <span className="nk-pill" style={{ background: s.bg, color: s.fg }}>
+      <span className="nk-dot" style={{ background: s.solid }}></span>{text}
+    </span>
+  );
+}
+
+function HealthDot({ health, size = 9 }) {
+  const s = NK.health[health];
+  return <span className="nk-dot" style={{ background: s.solid, width: size, height: size }}></span>;
+}
+
+/* Tarjeta KPI / indicador con barra de acento de estado a la izquierda. */
+
+function KpiCard({ label, value, accent, fg, delta, deltaColor }) {
+  return (
+    <Card className="nk-kpi" pad={false}>
+      <span className="accent" style={{ background: accent }}></span>
+      <div className="lab">{label}</div>
+      <div className="num" style={{ color: fg }}>{value}</div>
+      {delta && <div className="delta" style={{ color: deltaColor }}>{delta}</div>}
+    </Card>
+  );
+}
+
+/* Controles de formulario y filtros del Design System. */
+
+function Field({ label, children, required, error }) {
+  return (
+    <label className="nk-field">
+      {label && <span className="nk-field-label">{label}{required && <span style={{ color: 'var(--red-600)' }}> *</span>}</span>}
+      {children}
+      {error && <span className="nk-field-error">{error}</span>}
+    </label>
+  );
+}
+
+function TextInput({ value, onChange, placeholder, type = 'text', error }) {
+  return (
+    <input className={`nk-input ${error ? 'is-error' : ''}`} type={type} value={value} placeholder={placeholder}
+      onChange={(e) => onChange && onChange(e.target.value)} />
+  );
+}
+
+function SearchInput({ value, onChange, placeholder = 'Buscar…', style }) {
+  return (
+    <div className="nk-search" style={style}>
+      <Icon name="search" size={16} style={{ color: 'var(--fg-3)' }} />
+      <input value={value} placeholder={placeholder} onChange={(e) => onChange && onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function Select({ value, onChange, options }) {
+  return (
+    <select className="nk-input nk-select" value={value} onChange={(e) => onChange && onChange(e.target.value)}>
+      {options.map((o) => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
+    </select>
+  );
+}
+
+// Chips segmentados (filtros).
+function FilterChips({ options, value, onChange }) {
+  return (
+    <div className="nk-chips">
+      {options.map((o) => (
+        <button key={o.value} className={`nk-chip ${value === o.value ? 'is-active' : ''}`} onClick={() => onChange(o.value)}>
+          {o.dot && <span className="nk-dot" style={{ background: o.dot }}></span>}
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* Primitivas auxiliares: Avatar, PageHeader y Empty (estado vacío). */
+
+function Avatar({ initials, color = 'var(--blue-600)', size = 34 }) {
+  return (
+    <span className="nk-avatar" style={{ width: size, height: size, background: color, fontSize: size * 0.38 }}>
+      {initials}
+    </span>
+  );
+}
+
+function PageHeader({ title, subtitle, actions, eyebrow }) {
+  return (
+    <div className="nk-pagehead">
+      <div>
+        {eyebrow && <div className="nk-eyebrow" style={{ marginBottom: 4 }}>{eyebrow}</div>}
+        <h1 className="nk-page-title">{title}</h1>
+        {subtitle && <p className="nk-page-sub">{subtitle}</p>}
+      </div>
+      {actions && <div className="nk-pagehead-actions">{actions}</div>}
+    </div>
+  );
+}
+
+function Empty({ icon = 'inbox', title, sub }) {
+  return (
+    <div className="nk-empty">
+      <Icon name={icon} size={26} style={{ color: 'var(--fg-4)' }} />
+      <div className="nk-empty-title">{title}</div>
+      {sub && <div className="nk-empty-sub">{sub}</div>}
+    </div>
+  );
+}
+
+/* Tabla del Design System. Uso:
+     <Table columns={['Código','Nodo','Estado']}>
+       <tr>…</tr>
+     </Table>
+   Para casos con celdas/encabezados personalizados, usa <table className="nk-table"> directamente. */
+
+function Table({ columns = [], children }) {
+  return (
+    <table className="nk-table">
+      <thead>
+        <tr>{columns.map((c, i) => <th key={i}>{c}</th>)}</tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+/* Barra lateral navy. Navegación principal + secciones por permiso de rol.
+   El Operador no ve la sección Administración (Usuarios y roles). */
+
+const NAV_MAIN = [
+  { key: 'dashboard',    label: 'Dashboard',      icon: 'layout-dashboard' },
+  { key: 'nodes',        label: 'Nodos',          icon: 'share-2' },
+  { key: 'equipment',    label: 'Equipos',        icon: 'server' },
+  { key: 'maintenances', label: 'Mantenimientos', icon: 'wrench', badge: true },
+  { key: 'calendar',     label: 'Calendario',     icon: 'calendar-days' },
+  { key: 'map',          label: 'Mapa',           icon: 'map' },
+];
+const NAV_DATA = [
+  { key: 'evidence', label: 'Evidencias', icon: 'image' },
+  { key: 'reports',  label: 'Reportes',   icon: 'bar-chart-3' },
+];
+const NAV_ADMIN = [
+  { key: 'users', label: 'Usuarios y roles', icon: 'users' },
+];
+
+function Sidebar({ view, go, role, open, onClose }) {
+  const pendientes = DATA.maint.filter((m) => m.state === 'pendiente').length;
+  const me = role === 'admin'
+    ? DATA.users.find((u) => u.role === 'Administrador')
+    : DATA.users.find((u) => u.role === 'Operador');
+
+  const item = (n) => {
+    const active = view === n.key
+      || (view === 'node-detail' && n.key === 'nodes')
+      || (view === 'maint-detail' && n.key === 'maintenances');
+    return (
+      <button key={n.key} className={`nk-navitem ${active ? 'is-active' : ''}`}
+        onClick={() => { go(n.key); onClose && onClose(); }}>
+        <Icon name={n.icon} size={17} />
+        <span>{n.label}</span>
+        {n.badge && pendientes > 0 && <span className="nk-badge">{pendientes}</span>}
+      </button>
+    );
+  };
+
+  return (
+    <aside className={`nk-sidebar ${open ? 'is-open' : ''}`}>
+      <div className="nk-side-brand"><Logo height={26} variant="dark" /></div>
+      <div className="nk-side-section">Operación</div>
+      <nav className="nk-nav">
+        {NAV_MAIN.map(item)}
+        <div className="nk-side-section">Datos</div>
+        {NAV_DATA.map(item)}
+        {role === 'admin' && (
+          <>
+            <div className="nk-side-section">Administración</div>
+            {NAV_ADMIN.map(item)}
+          </>
+        )}
+      </nav>
+      <div className="nk-side-user">
+        <Avatar initials={me.initials} color={me.color} size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="nm">{me.name}</div>
+          <div className="rl">{role === 'admin' ? 'Administrador' : 'Operador'}</div>
+        </div>
+        <Icon name="settings" size={16} style={{ color: 'var(--fg-on-dark-2)' }} />
+      </div>
+    </aside>
+  );
+}
+
+/* Barra superior: hamburguesa (responsive), buscador, acción rápida, rol y salir. */
+
+function Topbar({ onMenu, role, onLogout }) {
+  return (
+    <header className="nk-topbar">
+      <button className="nk-iconbtn nk-hamburger" onClick={onMenu}><Icon name="menu" size={20} /></button>
+      <div className="nk-search" style={{ flex: 1, maxWidth: 420 }}>
+        <Icon name="search" size={16} style={{ color: 'var(--fg-3)' }} />
+        <input placeholder="Buscar nodo, equipo o código…" />
+      </div>
+      <div style={{ flex: 1 }}></div>
+      <button className="nk-btn nk-btn-secondary nk-btn-sm"><Icon name="plus" size={15} /><span>Nuevo</span></button>
+      <IconButton name="bell" title="Notificaciones" />
+      <span className="nk-pill" style={{ background: role === 'admin' ? 'var(--blue-50)' : 'var(--gray-100)', color: role === 'admin' ? 'var(--blue-700)' : 'var(--gray-600)' }}>
+        {role === 'admin' ? 'Administrador' : 'Operador'}
+      </span>
+      <IconButton name="log-out" title="Salir" onClick={onLogout} />
+    </header>
+  );
+}
+
+/* App shell responsive: Sidebar + scrim + Topbar + área de contenido. */
+
+function AppShell({ view, go, role, onLogout, children }) {
+  const [menu, setMenu] = useState(false);
+  return (
+    <div className="nk-app">
+      <Sidebar view={view} go={go} role={role} open={menu} onClose={() => setMenu(false)} />
+      <div className={`nk-scrim ${menu ? 'is-open' : ''}`} onClick={() => setMenu(false)}></div>
+      <div className="nk-main">
+        <Topbar onMenu={() => setMenu(true)} role={role} onLogout={onLogout} />
+        <main className="nk-content">
+          <div className="nk-content-inner">{children}</div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* Login institucional con campos de cuenta + contraseña, estado de error y
+   acceso demo por rol. El rol se deriva de la cuenta. Visual, sin backend. */
+
+// Credenciales demo (ficticias).
+const CREDENTIALS = {
+  'a.vargas@coopelesca.cr':   { pw: 'demo1234', role: 'admin' },
+  'm.solis@coopelesca.cr':    { pw: 'demo1234', role: 'admin' },
+  'j.alvarado@coopelesca.cr': { pw: 'demo1234', role: 'operator' },
+  'k.mendez@coopelesca.cr':   { pw: 'demo1234', role: 'operator' },
+};
+
+function Login({ onLogin }) {
+  const [email, setEmail] = useState('a.vargas@coopelesca.cr');
+  const [pw, setPw] = useState('demo1234');
+  const [error, setError] = useState(false);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const acc = CREDENTIALS[email.trim().toLowerCase()];
+    if (acc && acc.pw === pw) { setError(false); onLogin(acc.role); }
+    else setError(true);
+  };
+
+  return (
+    <div className="nk-login">
+      <div className="nk-login-aside">
+        <div className="nk-login-aside-top">
+          <Logo height={30} variant="dark" />
+        </div>
+        <div className="nk-login-aside-mid">
+          <h2>Mantenimiento de nodos, bajo control.</h2>
+          <p>Consulta nodos, equipos y mantenimientos. Ejecuta checklists, adjunta evidencia y mantén cada localidad en verde.</p>
+          <div className="nk-login-legend">
+            <span><span className="nk-dot" style={{ background: 'var(--green-500)' }}></span>Sin pendientes</span>
+            <span><span className="nk-dot" style={{ background: 'var(--amber-500)' }}></span>Tareas incompletas</span>
+            <span><span className="nk-dot" style={{ background: 'var(--red-500)' }}></span>Pendientes</span>
+          </div>
+        </div>
+        <div className="nk-login-aside-foot">© 2026 NodeKeeper · Coopelesca · Sistema de gestión de mantenimientos</div>
+      </div>
+
+      <div className="nk-login-main">
+        <div className="nk-login-card">
+          <div className="nk-login-mark"><Mark size={44} /></div>
+          <h1>Iniciar sesión</h1>
+          <p className="nk-login-sub">Ingresa con tu cuenta institucional.</p>
+          <form onSubmit={submit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 18 }}>
+              <Field label="Correo institucional" error={error ? ' ' : undefined}>
+                <TextInput value={email} onChange={(v) => { setEmail(v); setError(false); }} placeholder="nombre@coopelesca.cr" error={error} />
+              </Field>
+              <Field label="Contraseña" error={error ? ' ' : undefined}>
+                <TextInput value={pw} onChange={(v) => { setPw(v); setError(false); }} type="password" error={error} />
+              </Field>
+
+              {error && (
+                <div className="nk-callout" role="alert" style={{ marginTop: 2 }}>
+                  <Icon name="alert-circle" size={16} style={{ color: 'var(--red-600)' }} />
+                  <span>Credenciales incorrectas. Verifica tu correo y contraseña.</span>
+                </div>
+              )}
+
+              <div className="nk-login-row">
+                <label className="nk-check-inline"><input type="checkbox" defaultChecked /> Recordarme</label>
+                <a className="nk-link" href="#" onClick={(e) => e.preventDefault()}>¿Olvidaste tu contraseña?</a>
+              </div>
+              <Button variant="primary" size="lg" type="submit" iconRight="arrow-right" style={{ width: '100%', marginTop: 4 }}>Entrar</Button>
+            </div>
+          </form>
+          <div className="nk-login-demo">
+            <span>Entrar como demo:</span>
+            <button className="nk-btn nk-btn-secondary nk-btn-sm" type="button" onClick={() => onLogin('admin')}><Icon name="shield" size={14} />Administrador</button>
+            <button className="nk-btn nk-btn-secondary nk-btn-sm" type="button" onClick={() => onLogin('operator')}><Icon name="hard-hat" size={14} />Operador</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Dashboard: KPIs, tendencia 8 semanas, salud de nodos y mantenimientos recientes. */
+
+function KPIRow() {
+  return (
+    <div className="nk-kpis">
+      {DATA.kpis.map((k) => (
+        <KpiCard key={k.key} label={k.label} value={k.value} accent={k.accent} fg={k.fg} delta={k.delta} deltaColor={k.deltaColor} />
+      ))}
+    </div>
+  );
+}
+
+function TrendChart() {
+  const data = DATA.trend;
+  const max = Math.max(...data.map((d) => d.prev + d.corr));
+  return (
+    <Card pad>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h3 className="nk-section-title">Mantenimientos cerrados · 8 semanas</h3>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--fg-2)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="nk-dot" style={{ background: 'var(--blue-600)' }}></span>Preventivo</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="nk-dot" style={{ background: 'var(--navy-600)' }}></span>Correctivo</span>
+        </div>
+      </div>
+      <div className="nk-chart">
+        {data.map((d) => (
+          <div className="nk-bar-col" key={d.w}>
+            <div className="nk-bar-stack" style={{ height: '100%' }}>
+              <div className="nk-bar" style={{ height: (d.corr / max * 100) + '%', background: 'var(--navy-600)' }} title={`Correctivo: ${d.corr}`}></div>
+              <div className="nk-bar" style={{ height: (d.prev / max * 100) + '%', background: 'var(--blue-500)', borderRadius: '3px 3px 0 0' }} title={`Preventivo: ${d.prev}`}></div>
+            </div>
+            <span className="nk-bar-lab">{d.w}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function HealthSummary({ go }) {
+  const nodes = DATA.nodes;
+  const counts = { green: 0, amber: 0, red: 0 };
+  nodes.forEach((n) => counts[n.health]++);
+  const total = nodes.length;
+  const order = ['red', 'amber', 'green'];
+  return (
+    <Card pad>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <h3 className="nk-section-title">Estado de nodos</h3>
+        <a className="nk-link" onClick={() => go('map')}>Ver mapa</a>
+      </div>
+      <div className="nk-healthbar">
+        {order.map((h) => counts[h] > 0 && <div key={h} style={{ flex: counts[h], background: NK.health[h].solid }}></div>)}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+        {order.map((h) => (
+          <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <HealthDot health={h} size={10} />
+            <span style={{ fontSize: 13, color: 'var(--fg-1)', fontWeight: 500 }}>{NK.health[h].label}</span>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: NK.health[h].fg }}>{counts[h]}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-3)', width: 38, textAlign: 'right' }}>{Math.round(counts[h] / total * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function RecentMaint({ go }) {
+  const rows = DATA.maint.slice(0, 5);
+  return (
+    <Card pad={false}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 18px' }}>
+        <h3 className="nk-section-title">Mantenimientos recientes</h3>
+        <a className="nk-link" onClick={() => go('maintenances')}>Ver todos</a>
+      </div>
+      <table className="nk-table">
+        <thead><tr><th>Código</th><th>Nodo</th><th>Tipo</th><th>Responsable</th><th>Estado</th></tr></thead>
+        <tbody>
+          {rows.map((m) => (
+            <tr key={m.id} onClick={() => go('maint-detail', m.id)}>
+              <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{m.code}</td>
+              <td style={{ fontWeight: 600 }}>{m.node}</td>
+              <td><TypePill type={m.type} /></td>
+              <td style={{ color: 'var(--fg-2)' }}>{m.resp}</td>
+              <td><StatusPill state={m.state} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+function Dashboard({ go, role }) {
+  return (
+    <div>
+      <PageHeader eyebrow="Resumen operativo" title="Dashboard"
+        subtitle="Indicadores de mantenimiento en tiempo real."
+        actions={(
+          <>
+            <Button variant="secondary" icon="download">Exportar</Button>
+            {role === 'admin' && <Button variant="primary" icon="plus">Nuevo mantenimiento</Button>}
+          </>
+        )} />
+      <KPIRow />
+      <div className="nk-grid" style={{ gridTemplateColumns: '1.6fr 1fr', marginTop: 16 }}>
+        <TrendChart />
+        <HealthSummary go={go} />
+      </div>
+      <div style={{ marginTop: 16 }}><RecentMaint go={go} /></div>
+    </div>
+  );
+}
+
+/* Listado de nodos: búsqueda, filtros por estado (semáforo) y acceso al detalle. */
+
+function Nodes({ go }) {
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState('all');
+  const filters = [
+    { value: 'all', label: 'Todos' },
+    { value: 'red', label: 'Pendientes', dot: 'var(--red-600)' },
+    { value: 'amber', label: 'Incompletos', dot: 'var(--amber-500)' },
+    { value: 'green', label: 'Al día', dot: 'var(--green-600)' },
+  ];
+  const rows = DATA.nodes.filter((n) =>
+    (filter === 'all' || n.health === filter) &&
+    (q === '' || (n.name + n.code + n.city + n.locality).toLowerCase().includes(q.toLowerCase())));
+
+  return (
+    <div>
+      <PageHeader eyebrow="Infraestructura" title="Nodos"
+        subtitle={`${DATA.nodes.length} nodos · ${DATA.nodes.filter((n) => n.health === 'red').length} con pendientes`}
+        actions={(
+          <>
+            <Button variant="secondary" icon="map" onClick={() => go('map')}>Ver en mapa</Button>
+            <Button variant="primary" icon="plus">Crear nodo</Button>
+          </>
+        )} />
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar nodo, código o localidad…" style={{ flex: 1, minWidth: 240 }} />
+        <FilterChips options={filters} value={filter} onChange={setFilter} />
+        <Button variant="secondary" icon="sliders-horizontal" size="md">Filtros</Button>
+      </div>
+      <Card pad={false}>
+        <table className="nk-table">
+          <thead><tr><th></th><th>Código</th><th>Nodo</th><th>Localidad</th><th>Equipos</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((n) => (
+              <tr key={n.id} onClick={() => go('node-detail', n.id)}>
+                <td style={{ width: 8, paddingRight: 0 }}><HealthDot health={n.health} size={10} /></td>
+                <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{n.code}</td>
+                <td style={{ fontWeight: 600 }}>{n.name}</td>
+                <td style={{ color: 'var(--fg-2)' }}>{n.city} · {n.locality}</td>
+                <td className="nk-mono" style={{ color: 'var(--fg-3)' }}>{n.equip}</td>
+                <td>
+                  {n.health === 'red'
+                    ? <StatusPill state={{ ...NK.health.red, label: `${n.pending} pendientes` }} />
+                    : <StatusPill state={NK.health[n.health]} />}
+                </td>
+                <td style={{ textAlign: 'right', color: 'var(--fg-3)' }}><Icon name="chevron-right" size={16} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty icon="search-x" title="Sin resultados" sub="Ajusta la búsqueda o los filtros." />}
+      </Card>
+    </div>
+  );
+}
+
+/* Detalle de nodo: info general, coordenadas, equipos asociados y mantenimientos
+   relacionados. Accesos rápidos a mapa y a crear mantenimiento. */
+
+function NodeDetail({ id, go, role }) {
+  const n = DATA.nodes.find((x) => x.id === id) || DATA.nodes[0];
+  const equip = DATA.equipment.filter((e) => e.nodeId === n.id);
+  const rel = DATA.maint.filter((m) => m.nodeId === n.id);
+
+  return (
+    <div>
+      <button className="nk-back" onClick={() => go('nodes')}><Icon name="arrow-left" size={15} />Nodos</button>
+      <div className="nk-pagehead" style={{ alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span className="nk-node-ico" style={{ background: NK.health[n.health].bg }}><HealthDot health={n.health} size={14} /></span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h1 className="nk-page-title">{n.name}</h1>
+              <span className="nk-mono" style={{ fontSize: 13, color: 'var(--fg-3)' }}>{n.code}</span>
+            </div>
+            <p className="nk-page-sub">{n.city} · {n.locality}</p>
+          </div>
+        </div>
+        <div className="nk-pagehead-actions">
+          <Button variant="secondary" icon="map-pin" onClick={() => go('map')}>Ubicar</Button>
+          {role === 'admin' && <Button variant="secondary" icon="pencil">Editar</Button>}
+          <Button variant="primary" icon="plus">Nuevo mantenimiento</Button>
+        </div>
+      </div>
+
+      <Card pad style={{ marginBottom: 16 }}>
+        <div className="nk-meta-row">
+          <div className="nk-meta"><span className="k">Estado</span><span className="v">{NK.health[n.health].label}</span></div>
+          <div className="nk-meta"><span className="k">Pendientes</span><span className="v nk-mono">{n.pending}</span></div>
+          <div className="nk-meta"><span className="k">Equipos</span><span className="v nk-mono">{n.equip}</span></div>
+          <div className="nk-meta"><span className="k">Coordenadas</span><span className="v nk-mono" style={{ fontSize: 13 }}>10.3{n.x}, -84.4{n.y}</span></div>
+          <div className="nk-meta"><span className="k">Último mantenimiento</span><span className="v">2026-05-28</span></div>
+        </div>
+      </Card>
+
+      <div className="nk-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <Card pad={false}>
+          <div className="nk-card-head"><h3 className="nk-section-title">Equipos asociados</h3><span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{equip.length}</span></div>
+          <table className="nk-table">
+            <thead><tr><th>Código</th><th>Equipo</th><th>Tipo</th><th>Estado</th></tr></thead>
+            <tbody>
+              {equip.map((e) => { const s = NK.equipStatus[e.status]; return (
+                <tr key={e.id}>
+                  <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{e.code}</td>
+                  <td style={{ fontWeight: 600 }}>{e.name}</td>
+                  <td style={{ color: 'var(--fg-2)' }}>{e.type}</td>
+                  <td><span className="nk-pill" style={{ background: s.bg, color: s.fg }}><span className="nk-dot" style={{ background: s.solid }}></span>{s.label}</span></td>
+                </tr>); })}
+              {equip.length === 0 && <tr><td colSpan="4"><Empty icon="server" title="Sin equipos" sub="Este nodo no tiene equipos registrados." /></td></tr>}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card pad={false}>
+          <div className="nk-card-head"><h3 className="nk-section-title">Mantenimientos relacionados</h3><a className="nk-link" onClick={() => go('maintenances')}>Ver todos</a></div>
+          <table className="nk-table">
+            <thead><tr><th>Código</th><th>Tipo</th><th>Avance</th><th>Estado</th></tr></thead>
+            <tbody>
+              {rel.map((m) => (
+                <tr key={m.id} onClick={() => go('maint-detail', m.id)}>
+                  <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{m.code}</td>
+                  <td><TypePill type={m.type} /></td>
+                  <td style={{ width: 130 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ProgressBar value={NK.pct(m.tasks)} /><span className="nk-mono" style={{ fontSize: 11, color: 'var(--fg-3)', width: 30 }}>{NK.pct(m.tasks)}%</span></div></td>
+                  <td><StatusPill state={m.state} /></td>
+                </tr>
+              ))}
+              {rel.length === 0 && <tr><td colSpan="4"><Empty icon="check-circle-2" title="Sin mantenimientos" sub="Este nodo no tiene mantenimientos." /></td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* Equipos: inventario por nodo, filtros por nodo y estado operativo, y acción
+   para crear mantenimiento correctivo (disponible también para el Operador). */
+
+function Equipment({ go, role }) {
+  const [q, setQ] = useState('');
+  const [node, setNode] = useState('all');
+  const [status, setStatus] = useState('all');
+
+  const rows = DATA.equipment
+    .map((e) => ({ ...e, node: DATA.nodes.find((n) => n.id === e.nodeId)?.name || '—' }))
+    .filter((e) =>
+      (node === 'all' || e.nodeId === node) &&
+      (status === 'all' || e.status === status) &&
+      (q === '' || (e.name + e.code + e.node).toLowerCase().includes(q.toLowerCase())));
+
+  return (
+    <div>
+      <PageHeader eyebrow="Inventario" title="Equipos"
+        subtitle={`${DATA.equipment.length} equipos en ${DATA.nodes.length} nodos`}
+        actions={(
+          <>
+            <Button variant="secondary" icon="wrench" onClick={() => go('maintenances')}>Crear correctivo</Button>
+            {role === 'admin' && <Button variant="primary" icon="plus">Registrar equipo</Button>}
+          </>
+        )} />
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar equipo, código o nodo…" style={{ flex: 1, minWidth: 220 }} />
+        <Select value={node} onChange={setNode} options={[{ value: 'all', label: 'Todos los nodos' }, ...DATA.nodes.map((n) => ({ value: n.id, label: n.name }))]} />
+        <FilterChips value={status} onChange={setStatus} options={[
+          { value: 'all', label: 'Todos' },
+          { value: 'operativo', label: 'Operativo', dot: 'var(--green-600)' },
+          { value: 'alerta', label: 'Alerta', dot: 'var(--amber-500)' },
+          { value: 'falla', label: 'Falla', dot: 'var(--red-600)' }]} />
+      </div>
+
+      <Card pad={false}>
+        <table className="nk-table">
+          <thead><tr><th>Código</th><th>Equipo</th><th>Tipo</th><th>Nodo</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((e) => { const s = NK.equipStatus[e.status]; return (
+              <tr key={e.id} onClick={() => go('node-detail', e.nodeId)}>
+                <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{e.code}</td>
+                <td style={{ fontWeight: 600 }}>{e.name}</td>
+                <td style={{ color: 'var(--fg-2)' }}>{e.type}</td>
+                <td style={{ color: 'var(--fg-2)' }}>{e.node}</td>
+                <td><span className="nk-pill" style={{ background: s.bg, color: s.fg }}><span className="nk-dot" style={{ background: s.solid }}></span>{s.label}</span></td>
+                <td style={{ textAlign: 'right' }} onClick={(ev) => { ev.stopPropagation(); go('maintenances'); }}>
+                  <IconButton name="wrench" title="Crear correctivo" style={{ width: 30, height: 30 }} />
+                </td>
+              </tr>); })}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty icon="search-x" title="Sin resultados" sub="Ajusta la búsqueda o los filtros." />}
+      </Card>
+    </div>
+  );
+}
+
+/* Listado de mantenimientos: búsqueda + filtros por tipo y estado. Diferencia
+   preventivo/correctivo y muestra avance del checklist. Acciones según rol:
+   el Administrador crea cualquier orden; el Operador crea correctivos. */
+
+function Maintenances({ go, role }) {
+  const [q, setQ] = useState('');
+  const [state, setState] = useState('all');
+  const [type, setType] = useState('all');
+
+  const rows = DATA.maint.filter((m) =>
+    (state === 'all' || m.state === state) &&
+    (type === 'all' || m.type === type) &&
+    (q === '' || (m.node + m.code + m.resp).toLowerCase().includes(q.toLowerCase())));
+
+  return (
+    <div>
+      <PageHeader eyebrow="Órdenes de trabajo" title="Mantenimientos"
+        subtitle={`${DATA.maint.length} órdenes · ${DATA.maint.filter((m) => m.state === 'pendiente').length} pendientes`}
+        actions={role === 'admin'
+          ? <Button variant="primary" icon="plus">Nuevo mantenimiento</Button>
+          : <Button variant="primary" icon="wrench">Crear correctivo</Button>} />
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar código, nodo o responsable…" style={{ flex: 1, minWidth: 220 }} />
+        <FilterChips value={type} onChange={setType} options={[
+          { value: 'all', label: 'Todo tipo' },
+          { value: 'preventivo', label: 'Preventivo', dot: 'var(--blue-600)' },
+          { value: 'correctivo', label: 'Correctivo', dot: 'var(--navy-600)' }]} />
+        <FilterChips value={state} onChange={setState} options={[
+          { value: 'all', label: 'Todos' },
+          { value: 'pendiente', label: 'Pendiente', dot: 'var(--red-600)' },
+          { value: 'progreso', label: 'En progreso', dot: 'var(--amber-500)' },
+          { value: 'cerrado', label: 'Cerrado', dot: 'var(--green-600)' }]} />
+      </div>
+
+      <Card pad={false}>
+        <table className="nk-table">
+          <thead><tr><th>Código</th><th>Nodo</th><th>Tipo</th><th>Prioridad</th><th>Responsable</th><th>Fecha</th><th>Avance</th><th>Estado</th></tr></thead>
+          <tbody>
+            {rows.map((m) => (
+              <tr key={m.id} onClick={() => go('maint-detail', m.id)}>
+                <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{m.code}</td>
+                <td style={{ fontWeight: 600 }}>{m.node}</td>
+                <td><TypePill type={m.type} /></td>
+                <td><PriorityPill p={m.priority} /></td>
+                <td style={{ color: 'var(--fg-2)' }}>{m.resp}</td>
+                <td className="nk-mono" style={{ color: 'var(--fg-3)', fontSize: 12 }}>{m.date}</td>
+                <td style={{ width: 120 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ProgressBar value={NK.pct(m.tasks)} /><span className="nk-mono" style={{ fontSize: 11, color: 'var(--fg-3)', width: 28 }}>{NK.pct(m.tasks)}%</span></div></td>
+                <td><StatusPill state={m.state} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty icon="search-x" title="Sin resultados" sub="Ajusta la búsqueda o los filtros." />}
+      </Card>
+    </div>
+  );
+}
+
+/* Detalle de mantenimiento: checklist con avance %, regla de cierre al 100%,
+   evidencias y línea de actividad. El botón "Cerrar mantenimiento" permanece
+   bloqueado mientras el checklist no esté al 100% (mensaje de avance visible).
+   El Operador puede iniciar, marcar tareas y adjuntar evidencia. */
+
+function DetRow({ k, v, mono, link, onClick }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+      <span style={{ fontSize: 12, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{k}</span>
+      {link
+        ? <a className="nk-link" onClick={onClick} style={{ fontWeight: 600 }}>{v}</a>
+        : <span className={mono ? 'nk-mono' : ''} style={{ fontSize: 14, fontWeight: 500, textAlign: 'right' }}>{v}</span>}
+    </div>
+  );
+}
+
+function TLItem({ dot, title, time, by, last }) {
+  return (
+    <div className={`nk-tl-item ${last ? 'is-last' : ''}`}>
+      <span className="nk-tl-dot" style={{ background: dot }}></span>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{title}</div>
+        <div className="nk-mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{time} · {by}</div>
+      </div>
+    </div>
+  );
+}
+
+function MaintenanceDetail({ id, go }) {
+  const base = DATA.maint.find((m) => m.id === id) || DATA.maint[0];
+  const [tasks, setTasks] = useState(base.tasks.map((t) => ({ ...t })));
+  const [closed, setClosed] = useState(base.state === 'cerrado');
+  const [started, setStarted] = useState(base.state !== 'pendiente');
+
+  const pct = NK.pct(tasks);
+  const canClose = pct === 100 && !closed;
+  const toggle = (i) => { setStarted(true); setTasks((ts) => ts.map((t, j) => (j === i ? { ...t, done: !t.done } : t))); };
+  const evid = DATA.evidence;
+  const liveState = closed ? 'cerrado' : (pct > 0 || started ? 'progreso' : 'pendiente');
+
+  return (
+    <div>
+      <button className="nk-back" onClick={() => go('maintenances')}><Icon name="arrow-left" size={15} />Mantenimientos</button>
+      <div className="nk-pagehead" style={{ alignItems: 'center' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h1 className="nk-page-title">{base.node}</h1>
+            <span className="nk-mono" style={{ fontSize: 13, color: 'var(--fg-3)' }}>{base.code}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <TypePill type={base.type} /><StatusPill state={liveState} /><PriorityPill p={base.priority} />
+            {base.recurring && <span className="nk-pill" style={{ background: 'var(--blue-50)', color: 'var(--blue-700)' }}><Icon name="repeat" size={12} />Recurrente</span>}
+          </div>
+        </div>
+        <div className="nk-pagehead-actions">
+          {liveState === 'pendiente' && <Button variant="primary" icon="check-circle-2" onClick={() => setStarted(true)}>Iniciar mantenimiento</Button>}
+          <Button variant="secondary" icon="paperclip">Adjuntar evidencia</Button>
+          <Button variant="danger" icon="check-circle-2" disabled={!canClose} onClick={() => setClosed(true)}>
+            {closed ? 'Cerrado' : 'Cerrar mantenimiento'}
+          </Button>
+        </div>
+      </div>
+
+      {!closed && pct < 100 &&
+        <div className="nk-callout"><Icon name="lock" size={15} /><span>No puedes cerrar: el checklist está al <b className="nk-mono">{pct}%</b>. Este mantenimiento solo puede cerrarse cuando esté al <b>100%</b>.</span></div>}
+      {closed &&
+        <div className="nk-callout is-ok"><Icon name="check-circle-2" size={15} /><span>Mantenimiento cerrado. Checklist completado al 100%.</span></div>}
+
+      <div className="nk-grid" style={{ gridTemplateColumns: '1.5fr 1fr', marginTop: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Checklist */}
+          <Card pad={false}>
+            <div className="nk-card-head">
+              <h3 className="nk-section-title">Checklist</h3>
+              <span className="nk-mono" style={{ fontSize: 13, fontWeight: 600, color: pct === 100 ? 'var(--green-700)' : 'var(--amber-700)' }}>{pct}%</span>
+            </div>
+            <div style={{ padding: '0 18px' }}><ProgressBar value={pct} /></div>
+            <div className="nk-checklist">
+              {tasks.map((t, i) => (
+                <button key={i} className={`nk-task ${t.done ? 'is-done' : ''}`} onClick={() => !closed && toggle(i)} disabled={closed}>
+                  <span className={`nk-check ${t.done ? 'is-done' : ''}`}>{t.done && <Icon name="check" size={12} />}</span>
+                  <span className="nk-task-label">{t.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="nk-card-foot">
+              <span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tasks.filter((t) => t.done).length}/{tasks.length} tareas</span>
+              {!closed && <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>Marca las tareas para actualizar el avance →</span>}
+            </div>
+          </Card>
+
+          {/* Evidencias */}
+          <Card pad={false}>
+            <div className="nk-card-head"><h3 className="nk-section-title">Evidencias</h3><span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{evid.length}</span></div>
+            <div className="nk-evid-grid">
+              <button className="nk-evid-drop"><Icon name="upload-cloud" size={20} /><span>Subir archivo</span><small>Imagen o PDF</small></button>
+              {evid.map((v) => (
+                <div key={v.id} className="nk-evid">
+                  <div className="nk-evid-thumb" style={{ background: v.kind === 'image' ? 'var(--blue-50)' : 'var(--gray-100)' }}>
+                    <Icon name={v.kind === 'image' ? 'image' : 'file-text'} size={22} style={{ color: v.kind === 'image' ? 'var(--blue-600)' : 'var(--gray-500)' }} />
+                  </div>
+                  <div className="nk-evid-meta">
+                    <span className="nk-evid-name">{v.name}</span>
+                    <span className="nk-evid-sub nk-mono">{v.size} · {v.by}</span>
+                  </div>
+                  <button className="nk-iconbtn" style={{ width: 28, height: 28 }}><Icon name="download" size={15} /></button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Panel de detalle */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card pad>
+            <h3 className="nk-section-title" style={{ marginBottom: 14 }}>Detalle</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+              <DetRow k="Nodo" v={base.node} link onClick={() => go('node-detail', base.nodeId)} />
+              <DetRow k="Tipo" v={base.type === 'preventivo' ? 'Preventivo' : 'Correctivo'} />
+              {base.type === 'correctivo' && <DetRow k="Equipo" v={base.equip} mono />}
+              <DetRow k="Responsable" v={base.resp} />
+              <DetRow k="Programado" v={base.date} mono />
+              <DetRow k="Ejecución" v={base.exec === 'terceros' ? 'Terceros' : 'Interno'} />
+              <DetRow k="Recurrencia" v={base.recurring ? 'Mensual' : 'No aplica'} />
+            </div>
+          </Card>
+          <Card pad>
+            <h3 className="nk-section-title" style={{ marginBottom: 14 }}>Actividad</h3>
+            <div className="nk-timeline">
+              <TLItem dot="var(--blue-600)" title="Mantenimiento creado" time="2026-06-01 08:12" by="A. Vargas" />
+              <TLItem dot="var(--amber-500)" title="En ejecución" time="2026-06-04 09:30" by={base.resp} />
+              <TLItem dot="var(--green-600)" title="Evidencia adjuntada" time="2026-06-04 10:21" by={base.resp} last />
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Calendario de mantenimientos (junio 2026). Eventos coloreados por estado,
+   con filtros por tipo, estado y nodo. Click en un evento → mantenimientos. */
+
+const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function Calendar({ go }) {
+  const [type, setType] = useState('all');
+  const [state, setState] = useState('all');
+  const events = DATA.calendar.filter((e) => (type === 'all' || e.type === type) && (state === 'all' || e.state === state));
+  const byDay = {};
+  events.forEach((e) => { (byDay[e.day] = byDay[e.day] || []).push(e); });
+  const cells = [];
+  for (let i = 0; i < 30; i++) cells.push(i + 1); // junio empieza lunes → sin huecos iniciales
+  const today = 4;
+
+  return (
+    <div>
+      <PageHeader eyebrow="Programación" title="Calendario de mantenimientos"
+        subtitle="Junio 2026"
+        actions={(
+          <>
+            <Button variant="secondary" icon="chevron-left" size="sm"></Button>
+            <Button variant="secondary" size="sm">Hoy</Button>
+            <Button variant="secondary" icon="chevron-right" size="sm"></Button>
+            <Button variant="primary" icon="plus">Programar</Button>
+          </>
+        )} />
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <FilterChips value={type} onChange={setType} options={[
+          { value: 'all', label: 'Todo tipo' },
+          { value: 'preventivo', label: 'Preventivo', dot: 'var(--blue-600)' },
+          { value: 'correctivo', label: 'Correctivo', dot: 'var(--navy-600)' }]} />
+        <FilterChips value={state} onChange={setState} options={[
+          { value: 'all', label: 'Todo estado' },
+          { value: 'pendiente', label: 'Pendiente', dot: 'var(--red-600)' },
+          { value: 'progreso', label: 'En progreso', dot: 'var(--amber-500)' },
+          { value: 'cerrado', label: 'Cerrado', dot: 'var(--green-600)' }]} />
+        <Select value="all" onChange={() => {}} options={[{ value: 'all', label: 'Todos los nodos' }, ...DATA.nodes.map((n) => ({ value: n.id, label: n.name }))]} />
+      </div>
+
+      <Card pad={false} className="nk-cal">
+        <div className="nk-cal-dow">{DOW.map((d) => <div key={d}>{d}</div>)}</div>
+        <div className="nk-cal-grid">
+          {cells.map((day) => (
+            <div key={day} className={`nk-cal-cell ${day === today ? 'is-today' : ''}`}>
+              <span className="nk-cal-day">{day}</span>
+              <div className="nk-cal-events">
+                {(byDay[day] || []).slice(0, 3).map((e) => {
+                  const s = NK.state[e.state];
+                  return (
+                    <button key={e.code} className="nk-cal-ev" style={{ background: s.bg, color: s.fg }} onClick={() => go('maintenances')}>
+                      <span className="nk-dot" style={{ background: s.solid }}></span>
+                      <span className="nk-cal-ev-txt">{e.node}</span>
+                    </button>
+                  );
+                })}
+                {(byDay[day] || []).length > 3 && <span className="nk-cal-more">+{byDay[day].length - 3} más</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* Mapa de nodos (placeholder estilizado del Design System — sustituible por
+   Leaflet/Mapbox). Marcadores coloreados por salud (verde/ámbar/rojo), leyenda
+   con conteos y panel lateral al seleccionar un nodo, con acceso al detalle. */
+
+function MapPage({ go }) {
+  const [sel, setSel] = useState(null);
+  const [hidden, setHidden] = useState({});
+  const nodes = DATA.nodes;
+  const counts = { green: 0, amber: 0, red: 0 };
+  nodes.forEach((n) => counts[n.health]++);
+  const selNode = nodes.find((n) => n.id === sel);
+  const legend = [
+    { k: 'green', label: 'Sin pendientes' },
+    { k: 'amber', label: 'Tareas incompletas' },
+    { k: 'red', label: 'Pendientes' },
+  ];
+
+  return (
+    <div>
+      <PageHeader eyebrow="Geolocalización" title="Mapa de nodos"
+        subtitle={`${nodes.length} nodos · Zona Norte, San Carlos`}
+        actions={<Button variant="secondary" icon="list" onClick={() => go('nodes')}>Ver listado</Button>} />
+
+      <div className="nk-map-wrap">
+        <div className="nk-map">
+          <div className="nk-map-canvas"></div>
+          <div className="nk-map-grid"></div>
+          <div className="nk-map-land" style={{ left: '12%', top: '18%', width: '40%', height: '46%' }}></div>
+          <div className="nk-map-land" style={{ left: '54%', top: '40%', width: '34%', height: '40%', borderRadius: '50% 40% 60% 30%' }}></div>
+          <div className="nk-map-road" style={{ left: '16%', top: '34%', width: '60%' }}></div>
+          <div className="nk-map-road" style={{ left: '30%', top: '20%', width: '46%', transform: 'rotate(58deg)' }}></div>
+          <div className="nk-map-road" style={{ left: '22%', top: '60%', width: '52%', transform: 'rotate(-18deg)' }}></div>
+
+          {nodes.filter((n) => !hidden[n.health]).map((n) => {
+            const s = NK.health[n.health];
+            return (
+              <button key={n.id} className={`nk-marker ${sel === n.id ? 'is-active' : ''}`} style={{ left: n.x + '%', top: n.y + '%' }} onClick={() => setSel(n.id)}>
+                <span className="nk-marker-pin" style={{ background: s.solid }}>
+                  {n.health === 'red' ? <span className="nk-marker-count">{n.pending}</span> : <span className="nk-marker-inner"></span>}
+                </span>
+              </button>
+            );
+          })}
+
+          <div className="nk-map-legend">
+            {legend.map((l) => (
+              <button key={l.k} className={`nk-legend-item ${hidden[l.k] ? 'is-off' : ''}`} onClick={() => setHidden((h) => ({ ...h, [l.k]: !h[l.k] }))}>
+                <HealthDot health={l.k} size={9} />
+                <span>{l.label}</span>
+                <span className="nk-legend-count nk-mono">{counts[l.k]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="nk-map-placeholder-note">Mapa ilustrativo · sustituir por Leaflet / Mapbox</div>
+        </div>
+
+        <Card pad={false} className="nk-map-panel">
+          {selNode ? (
+            <div>
+              <div className="nk-card-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <HealthDot health={selNode.health} size={11} />
+                  <h3 className="nk-section-title">{selNode.name}</h3>
+                </div>
+                <button className="nk-iconbtn" style={{ width: 28, height: 28 }} onClick={() => setSel(null)}><Icon name="chevron-right" size={16} /></button>
+              </div>
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 13 }}>
+                <div className="nk-meta"><span className="k">Código</span><span className="v nk-mono">{selNode.code}</span></div>
+                <div className="nk-meta"><span className="k">Localidad</span><span className="v">{selNode.city} · {selNode.locality}</span></div>
+                <div className="nk-meta"><span className="k">Estado</span><span className="v">
+                  {selNode.health === 'red'
+                    ? <StatusPill state={{ ...NK.health.red, label: `${selNode.pending} pendientes` }} />
+                    : <StatusPill state={NK.health[selNode.health]} />}
+                </span></div>
+                <div className="nk-meta"><span className="k">Coordenadas</span><span className="v nk-mono" style={{ fontSize: 13 }}>10.3{selNode.x}, -84.4{selNode.y}</span></div>
+                <div className="nk-meta"><span className="k">Equipos</span><span className="v nk-mono">{selNode.equip}</span></div>
+                <Button variant="primary" icon="arrow-right" style={{ width: '100%', marginTop: 4 }} onClick={() => go('node-detail', selNode.id)}>Ver detalle del nodo</Button>
+              </div>
+            </div>
+          ) : (
+            <Empty icon="map-pin" title="Selecciona un nodo" sub="Toca un marcador para ver su información." />
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* Evidencias: galería de archivos adjuntos (JPG, PNG, PDF, DOCX) con área de
+   subida, autor y fecha, y acciones Ver / Descargar. Visual, sin backend. */
+
+const KINDS = {
+  jpg: { tag: 'JPG', icon: 'image', bg: 'var(--blue-50)', fg: 'var(--blue-600)' },
+  png: { tag: 'PNG', icon: 'image', bg: 'var(--blue-50)', fg: 'var(--blue-600)' },
+  pdf: { tag: 'PDF', icon: 'file-text', bg: 'var(--red-50)', fg: 'var(--red-600)' },
+  docx: { tag: 'DOCX', icon: 'file-text', bg: 'var(--blue-50)', fg: 'var(--blue-700)' },
+};
+
+// Galería ampliada (incluye más tipos para mostrar el soporte de formatos).
+const FILES = [
+  { name: 'gabinete-frontal.jpg', ext: 'jpg', size: '2.4 MB', date: '2026-06-04 09:32', by: 'A. Vargas', node: 'NODE-001' },
+  { name: 'medicion-voltaje.png', ext: 'png', size: '1.8 MB', date: '2026-06-04 10:05', by: 'A. Vargas', node: 'NODE-001' },
+  { name: 'reporte-ups.pdf', ext: 'pdf', size: '320 KB', date: '2026-06-04 10:21', by: 'A. Vargas', node: 'NODE-001' },
+  { name: 'acta-cierre.docx', ext: 'docx', size: '88 KB', date: '2026-05-28 16:40', by: 'K. Méndez', node: 'NODE-027' },
+  { name: 'filtros-limpieza.jpg', ext: 'jpg', size: '2.1 MB', date: '2026-06-04 09:48', by: 'J. Alvarado', node: 'NODE-001' },
+  { name: 'falla-generador.jpg', ext: 'jpg', size: '3.0 MB', date: '2026-06-05 11:02', by: 'J. Alvarado', node: 'NODE-008' },
+  { name: 'informe-tecnico.pdf', ext: 'pdf', size: '512 KB', date: '2026-05-22 14:15', by: 'A. Vargas', node: 'NODE-019' },
+  { name: 'rack-posterior.png', ext: 'png', size: '1.5 MB', date: '2026-06-06 08:20', by: 'J. Alvarado', node: 'NODE-014' },
+];
+
+function Evidence() {
+  return (
+    <div>
+      <PageHeader eyebrow="Adjuntos" title="Evidencias"
+        subtitle={`${FILES.length} archivos · JPG, PNG, PDF y DOCX`}
+        actions={<Button variant="primary" icon="upload-cloud">Subir archivo</Button>} />
+
+      <Card pad style={{ marginBottom: 16, borderStyle: 'dashed', borderColor: 'var(--border-2)', background: 'var(--bg-subtle)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center', padding: '6px 0', color: 'var(--fg-2)' }}>
+          <Icon name="upload-cloud" size={22} style={{ color: 'var(--blue-600)' }} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-1)' }}>Arrastra archivos aquí o haz clic para subir</div>
+            <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Formatos: JPG, PNG, PDF, DOCX · hasta 10 MB</div>
+          </div>
+        </div>
+      </Card>
+
+      <div className="nk-gallery">
+        {FILES.map((f) => {
+          const k = KINDS[f.ext];
+          return (
+            <Card key={f.name} pad={false} className="nk-gal-card">
+              <div className="nk-gal-thumb" style={{ background: k.bg }}>
+                <span className="nk-gal-kind">{k.tag}</span>
+                <Icon name={k.icon} size={30} style={{ color: k.fg }} />
+              </div>
+              <div className="nk-gal-meta">
+                <div className="nk-gal-name">{f.name}</div>
+                <div className="nk-gal-sub nk-mono">{f.size} · {f.node}</div>
+                <div className="nk-gal-sub">{f.by} · {f.date.split(' ')[0]}</div>
+                <div className="nk-gal-foot">
+                  <button className="nk-btn nk-btn-subtle nk-btn-sm"><Icon name="eye" size={14} />Ver</button>
+                  <button className="nk-btn nk-btn-subtle nk-btn-sm"><Icon name="download" size={14} />Descargar</button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* Reportes: filtros visuales (nodo + rango de fechas), tabla de mantenimientos
+   realizados con estado, responsable, fecha de cierre y observaciones, y
+   botón de exportación. Visual, sin backend. */
+
+const ROWS = [
+  { code: 'MNT-2033', node: 'Repetidora Cerro Chato', nodeId: 'n3', type: 'preventivo', state: 'cerrado', resp: 'Karla Méndez', close: '2026-05-28', obs: 'Sin novedades. Firmware actualizado.' },
+  { code: 'MNT-2025', node: 'Subestación Pital', nodeId: 'n5', type: 'correctivo', state: 'cerrado', resp: 'Adriana Vargas', close: '2026-05-22', obs: 'Batería UPS reemplazada.' },
+  { code: 'MNT-2041', node: 'Subestación Ciudad Quesada', nodeId: 'n1', type: 'preventivo', state: 'progreso', resp: 'Adriana Vargas', close: '—', obs: 'En ejecución (50%).' },
+  { code: 'MNT-2038', node: 'Nodo Industrial Florencia', nodeId: 'n4', type: 'correctivo', state: 'pendiente', resp: 'José Alvarado', close: '—', obs: 'Espera repuesto de generador.' },
+  { code: 'MNT-2044', node: 'Repetidora Muelle', nodeId: 'n7', type: 'preventivo', state: 'cerrado', resp: 'Greivin Salas', close: '2026-06-12', obs: 'Inspección completa.' },
+];
+
+function Reports() {
+  const [node, setNode] = useState('all');
+  const [from, setFrom] = useState('2026-05-01');
+  const [to, setTo] = useState('2026-06-30');
+  const rows = ROWS.filter((r) => node === 'all' || r.nodeId === node);
+
+  return (
+    <div>
+      <PageHeader eyebrow="Análisis" title="Reportes"
+        subtitle="Mantenimientos realizados por nodo y rango de fechas."
+        actions={<Button variant="primary" icon="printer">Exportar</Button>} />
+
+      <Card pad style={{ marginBottom: 16 }}>
+        <div className="nk-report-form">
+          <Field label="Nodo">
+            <Select value={node} onChange={setNode} options={[{ value: 'all', label: 'Todos los nodos' }, ...DATA.nodes.map((n) => ({ value: n.id, label: n.name }))]} />
+          </Field>
+          <Field label="Desde"><TextInput type="date" value={from} onChange={setFrom} /></Field>
+          <Field label="Hasta"><TextInput type="date" value={to} onChange={setTo} /></Field>
+          <Field label="Estado">
+            <Select value="all" onChange={() => {}} options={[{ value: 'all', label: 'Todos' }, { value: 'cerrado', label: 'Cerrado' }, { value: 'progreso', label: 'En progreso' }, { value: 'pendiente', label: 'Pendiente' }]} />
+          </Field>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <Button variant="secondary" icon="bar-chart-3" style={{ width: '100%' }}>Generar</Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card pad={false}>
+        <div className="nk-card-head">
+          <h3 className="nk-section-title">Resultados</h3>
+          <span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{rows.length} registros · {from} → {to}</span>
+        </div>
+        <table className="nk-table">
+          <thead><tr><th>Código</th><th>Nodo</th><th>Tipo</th><th>Responsable</th><th>Cierre</th><th>Estado</th><th>Observaciones</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.code}>
+                <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{r.code}</td>
+                <td style={{ fontWeight: 600 }}>{r.node}</td>
+                <td><TypePill type={r.type} /></td>
+                <td style={{ color: 'var(--fg-2)' }}>{r.resp}</td>
+                <td className="nk-mono" style={{ color: 'var(--fg-3)', fontSize: 12 }}>{r.close}</td>
+                <td><StatusPill state={r.state} /></td>
+                <td style={{ color: 'var(--fg-2)', maxWidth: 220 }}>{r.obs}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty icon="search-x" title="Sin registros" sub="Ajusta el nodo o el rango de fechas." />}
+      </Card>
+    </div>
+  );
+}
+
+/* Usuarios y roles: sección administrativa (solo Administrador). Tabla de
+   usuarios con nombre, email, rol, estado y acciones. Para el Operador se
+   muestra un aviso de acceso restringido. */
+
+function UsersPage({ role }) {
+  if (role !== 'admin') {
+    return (
+      <div>
+        <PageHeader eyebrow="Administración" title="Usuarios y roles" />
+        <Card pad>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 4px' }}>
+            <span className="nk-node-ico" style={{ background: 'var(--gray-100)' }}><Icon name="lock" size={20} style={{ color: 'var(--fg-3)' }} /></span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>Acceso restringido</div>
+              <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>La administración de usuarios está disponible solo para el rol Administrador.</div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader eyebrow="Administración" title="Usuarios y roles"
+        subtitle={`${DATA.users.length} usuarios · ${DATA.users.filter((u) => u.role === 'Administrador').length} administradores`}
+        actions={<Button variant="primary" icon="user-plus">Invitar usuario</Button>} />
+
+      <Card pad style={{ marginBottom: 16, background: 'var(--blue-50)', borderColor: 'var(--blue-100)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--blue-700)', fontSize: 13 }}>
+          <Icon name="shield" size={16} />
+          <span>Sección administrativa. Los cambios afectan permisos y acceso al sistema.</span>
+        </div>
+      </Card>
+
+      <Card pad={false}>
+        <table className="nk-table">
+          <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Estado</th><th>Última actividad</th><th></th></tr></thead>
+          <tbody>
+            {DATA.users.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Avatar initials={u.initials} color={u.color} size={32} />
+                    <span style={{ fontWeight: 600 }}>{u.name}</span>
+                  </div>
+                </td>
+                <td className="nk-mono" style={{ color: 'var(--fg-2)', fontSize: 12 }}>{u.email}</td>
+                <td><RolePill role={u.role} /></td>
+                <td>
+                  <StatusPill state={u.status === 'activo'
+                    ? { fg: 'var(--green-700)', bg: 'var(--green-50)', solid: 'var(--green-600)', label: 'Activo' }
+                    : { fg: 'var(--gray-600)', bg: 'var(--gray-100)', solid: 'var(--gray-400)', label: 'Inactivo' }} />
+                </td>
+                <td style={{ color: 'var(--fg-3)', fontSize: 12 }}>{u.last}</td>
+                <td style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'inline-flex', gap: 4 }}>
+                    <IconButton name="pencil" title="Editar" style={{ width: 30, height: 30 }} />
+                    <IconButton name="lock" title="Bloquear" style={{ width: 30, height: 30 }} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+/* NodeKeeper · Coopelesca — App raíz
+   Enrutamiento visual por estado (sin librería de routing: prototipo) + sesión
+   demo con rol. Tras login se entra al Dashboard. La navegación entre pantallas
+   se hace con go(view, id). Sin backend.
+
+   Flujos cubiertos:
+     Login → Dashboard
+     Dashboard → Detalle de mantenimiento
+     Mantenimientos → Detalle de mantenimiento → Checklist/Evidencias
+     Nodos → Detalle de nodo → Mapa
+     Mapa → Detalle de nodo
+     Calendario → Mantenimientos
+     Reportes con filtros visuales
+*/
+
+function App() {
+  const [authed, setAuthed] = useState(false);
+  const [role, setRole] = useState('admin');
+  const [view, setView] = useState('dashboard');
+  const [selId, setSelId] = useState(null);
+
+  const go = (v, id) => {
+    setView(v);
+    if (id !== undefined) setSelId(id);
+    const c = document.querySelector('.nk-content');
+    if (c) c.scrollTop = 0;
+  };
+
+  if (!authed) {
+    return <Login onLogin={(r) => { setRole(r); setAuthed(true); setView('dashboard'); }} />;
+  }
+
+  let screen;
+  switch (view) {
+    case 'dashboard':    screen = <Dashboard go={go} role={role} />; break;
+    case 'nodes':        screen = <Nodes go={go} />; break;
+    case 'node-detail':  screen = <NodeDetail id={selId} go={go} role={role} />; break;
+    case 'equipment':    screen = <Equipment go={go} role={role} />; break;
+    case 'maintenances': screen = <Maintenances go={go} role={role} />; break;
+    case 'maint-detail': screen = <MaintenanceDetail id={selId} go={go} role={role} />; break;
+    case 'calendar':     screen = <Calendar go={go} />; break;
+    case 'map':          screen = <MapPage go={go} />; break;
+    case 'evidence':     screen = <Evidence />; break;
+    case 'reports':      screen = <Reports />; break;
+    case 'users':        screen = <UsersPage role={role} />; break;
+    default:             screen = <Dashboard go={go} role={role} />;
+  }
+
+  return (
+    <AppShell view={view} go={go} role={role} onLogout={() => setAuthed(false)}>
+      {screen}
+    </AppShell>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+} catch(e){ document.getElementById("root").innerHTML="<pre style=\"padding:20px;color:#b00;white-space:pre-wrap\">"+(e&&e.stack||e)+"</pre>"; }
+</script></body></html>

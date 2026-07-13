@@ -1,0 +1,257 @@
+/* ============================================================================
+   NodeKeeper Design System — Tokens (color & type) · Coopelesca
+   Portado de colors_and_type.css del Design System NodeKeeper. Sin cambios de
+   valores: mismos colores, tipografías y escalas. Solo se ajustaron las rutas
+   de las fuentes a /fonts/ (carpeta public/).
+   ============================================================================ */
+
+/* IBM Plex Mono (códigos/métricas) desde CDN.
+   Debe ir ANTES de cualquier @font-face u otra regla: el spec CSS exige que
+   todo @import preceda al resto de declaraciones (evita el warning del build
+   "@import must precede all other statements"). */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+@font-face {
+  font-family: 'Homepage Baukasten';
+  src: url('/fonts/HomepageBaukasten-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/Nunito-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/Nunito-Italic-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* ---- Navy: chrome / sidebar / brand ---- */
+  --navy-950: #0F1F4F;
+  --navy-900: #17307A;
+  --navy-800: #2A4185;
+  --navy-700: #415592;
+  --navy-600: #6172A5;
+  --navy-500: #8B97BD;
+
+  /* ---- Blue: acciones, enlaces, focus ---- */
+  --blue-800: #173E86;
+  --blue-700: #1B4FA8;
+  --blue-600: #2563C9;   /* PRIMARY */
+  --blue-500: #3B7DE0;
+  --blue-400: #6BA0EC;
+  --blue-200: #BCD4F7;
+  --blue-100: #DCE8FB;
+  --blue-50:  #EEF4FE;
+
+  /* ---- Gray: neutrales (cool-tinted) ---- */
+  --gray-950: #0D141C;
+  --gray-900: #111A24;
+  --gray-800: #1F2A36;
+  --gray-700: #33404E;
+  --gray-600: #4B5969;
+  --gray-500: #67768A;
+  --gray-400: #97A4B2;
+  --gray-300: #C7D0DA;
+  --gray-200: #DDE3EA;
+  --gray-150: #E6EBF0;
+  --gray-100: #EDF1F5;
+  --gray-50:  #F6F8FA;
+  --white:    #FFFFFF;
+
+  /* ---- Status (semáforo) ---- */
+  --green-700: #0E7A41;
+  --green-600: #15924F;   /* CERRADO / OK */
+  --green-500: #22A862;
+  --green-100: #DBF1E4;
+  --green-50:  #ECF8F1;
+
+  --amber-700: #A8650A;
+  --amber-600: #C77A0A;   /* EN PROGRESO */
+  --amber-500: #E2941C;
+  --amber-100: #FBEAD0;
+  --amber-50:  #FCF4E5;
+
+  --red-700: #B22B2B;
+  --red-600: #D23B3B;     /* PENDIENTE / ERROR */
+  --red-500: #E45A5A;
+  --red-100: #FAE0E0;
+  --red-50:  #FCEDED;
+
+  --info-600: var(--blue-600);
+  --info-100: var(--blue-100);
+  --info-50:  var(--blue-50);
+
+  /* ---- Roles semánticos ---- */
+  --fg-1: var(--gray-900);
+  --fg-2: var(--gray-600);
+  --fg-3: var(--gray-500);
+  --fg-4: var(--gray-400);
+  --fg-on-dark:    #E8EEF5;
+  --fg-on-dark-2:  #9DB0C6;
+  --fg-on-accent:  #FFFFFF;
+
+  --bg-app:     var(--gray-50);
+  --bg-surface: var(--white);
+  --bg-subtle:  var(--gray-100);
+  --bg-sunken:  var(--gray-150);
+  --bg-chrome:  var(--navy-900);
+  --bg-chrome-2:var(--navy-800);
+
+  --border-1: var(--gray-200);
+  --border-2: var(--gray-300);
+  --border-strong: var(--gray-400);
+  --border-on-dark: rgba(255,255,255,0.10);
+
+  --accent:        var(--blue-600);
+  --accent-hover:  var(--blue-700);
+  --accent-press:  var(--blue-800);
+  --accent-subtle: var(--blue-50);
+  --focus-ring:    var(--blue-500);
+  --link:          var(--blue-700);
+
+  --ok-fg: var(--green-700);     --ok-bg: var(--green-50);     --ok-solid: var(--green-600);
+  --warn-fg: var(--amber-700);   --warn-bg: var(--amber-50);   --warn-solid: var(--amber-500);
+  --danger-fg: var(--red-700);   --danger-bg: var(--red-50);   --danger-solid: var(--red-600);
+  --info-fg: var(--blue-700);    --info-bg: var(--blue-50);     --info-solid: var(--blue-600);
+  --neutral-fg: var(--gray-600); --neutral-bg: var(--gray-100); --neutral-solid: var(--gray-400);
+
+  /* ---- Tipografía ---- */
+  --font-display: 'Homepage Baukasten', 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Nunito', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --text-display: 34px;
+  --text-h1: 26px;
+  --text-h2: 20px;
+  --text-h3: 16px;
+  --text-base: 14px;
+  --text-sm: 13px;
+  --text-xs: 12px;
+  --text-2xs: 11px;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --tracking-eyebrow: 0.08em;
+  --tracking-tight: -0.01em;
+
+  /* ---- Spacing / radii / shadow / motion ---- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px;
+  --radius-lg: 12px; --radius-xl: 16px; --radius-pill: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(13, 26, 43, 0.06);
+  --shadow-sm: 0 1px 3px rgba(13, 26, 43, 0.08), 0 1px 2px rgba(13, 26, 43, 0.04);
+  --shadow-md: 0 4px 12px rgba(13, 26, 43, 0.10), 0 1px 3px rgba(13, 26, 43, 0.06);
+  --shadow-lg: 0 12px 28px rgba(13, 26, 43, 0.14), 0 4px 10px rgba(13, 26, 43, 0.08);
+  --shadow-focus: 0 0 0 3px rgba(59, 125, 224, 0.35);
+
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+  --ease-standard: cubic-bezier(0.2, 0.6, 0.2, 1);
+
+  /* ============================================================
+     LIQUID GLASS — capa visual translúcida (estilo Apple)
+     Construida 100% sobre la paleta del Design System (navy / blue /
+     semáforo) a baja opacidad: no introduce ningún color nuevo, solo
+     transparencia, luminosidad y profundidad.
+     ============================================================ */
+
+  /* Lienzo luminoso (tintes claros del azul institucional) */
+  --liquid-canvas-1: #eef5ff;
+  --liquid-canvas-2: #f8fbff;
+  --liquid-canvas-3: #dcecff;
+
+  /* Azules / navy translúcidos para chrome y acentos */
+  --liquid-blue:        rgba(37, 99, 201, 0.62);
+  --liquid-blue-strong: rgba(37, 99, 201, 0.80);
+  --liquid-blue-soft:   rgba(37, 99, 201, 0.16);
+  --liquid-navy:        rgba(20, 42, 105, 0.60);
+  --liquid-navy-strong: rgba(15, 31, 79, 0.74);
+  --liquid-navy-bright: rgba(45, 110, 215, 0.42);
+
+  /* Superficies de vidrio (muy translúcidas) */
+  --liquid-surface:        rgba(255, 255, 255, 0.36);
+  --liquid-surface-strong: rgba(255, 255, 255, 0.52);
+  --liquid-surface-soft:   rgba(255, 255, 255, 0.22);
+
+  /* Bordes luminosos */
+  --liquid-border:      rgba(255, 255, 255, 0.62);
+  --liquid-border-soft: rgba(255, 255, 255, 0.34);
+  --liquid-border-dark: rgba(255, 255, 255, 0.16);
+  --liquid-highlight:        rgba(255, 255, 255, 0.72);
+  --liquid-inner-highlight:  rgba(255, 255, 255, 0.38);
+
+  /* Estados semáforo en vidrio (mismas tres familias del sistema) */
+  --liquid-red-bg:     rgba(210, 59, 59, 0.13);
+  --liquid-red-border: rgba(210, 59, 59, 0.30);
+  --liquid-red-text:   #8f2020;
+  --liquid-amber-bg:     rgba(226, 148, 28, 0.15);
+  --liquid-amber-border: rgba(226, 148, 28, 0.32);
+  --liquid-amber-text:   #7a4b06;
+  --liquid-green-bg:     rgba(34, 168, 98, 0.14);
+  --liquid-green-border: rgba(34, 168, 98, 0.30);
+  --liquid-green-text:   #0b6b38;
+
+  /* Desenfoques */
+  --liquid-blur:        34px;
+  --liquid-blur-strong: 46px;
+
+  /* Sombras con doble luz interior (el sello del liquid glass) */
+  --liquid-shadow:
+    0 20px 70px rgba(15, 31, 79, 0.10),
+    0 8px 24px rgba(15, 31, 79, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+  --liquid-shadow-hover:
+    0 30px 90px rgba(15, 31, 79, 0.15),
+    0 12px 32px rgba(37, 99, 201, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.22);
+  --liquid-glow-blue:
+    0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 0 32px rgba(37, 99, 201, 0.24);
+
+  /* ---- Aliases compat (clases existentes siguen funcionando) ---- */
+  --glass-bg:        var(--liquid-surface);
+  --glass-bg-strong: var(--liquid-surface-strong);
+  --glass-bg-soft:   var(--liquid-surface-soft);
+  --glass-border:    var(--liquid-border);
+  --glass-border-2:  rgba(23, 48, 122, 0.10);
+  --glass-input:     rgba(255, 255, 255, 0.30);
+  --glass-blur:      var(--liquid-blur);
+  --glass-shadow:    var(--liquid-shadow);
+  --glass-shadow-lg: var(--liquid-shadow-hover);
+  --chrome-glass:    var(--liquid-navy);
+  --topbar-glass:    rgba(248, 251, 255, 0.46);
+}
+
+/* ---- Clases de tipo (helpers) ---- */
+.nk-display { font-family: var(--font-display); font-size: var(--text-display); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-tight); color: var(--fg-1); }
+.nk-h1 { font-family: var(--font-display); font-size: var(--text-h1); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-tight); color: var(--fg-1); }
+.nk-h2 { font-family: var(--font-sans); font-size: var(--text-h2); font-weight: var(--weight-semibold); line-height: var(--leading-snug); color: var(--fg-1); }
+.nk-h3 { font-family: var(--font-sans); font-size: var(--text-h3); font-weight: var(--weight-semibold); line-height: var(--leading-snug); color: var(--fg-1); }
+.nk-body { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--weight-regular); line-height: var(--leading-normal); color: var(--fg-1); }
+.nk-small { font-family: var(--font-sans); font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--fg-2); }
+.nk-eyebrow { font-family: var(--font-sans); font-size: var(--text-2xs); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--fg-3); }
+.nk-mono { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--fg-1); font-feature-settings: 'zero' 1; }
+.nk-metric { font-family: var(--font-mono); font-size: var(--text-display); font-weight: var(--weight-semibold); line-height: 1; letter-spacing: -0.01em; color: var(--fg-1); }

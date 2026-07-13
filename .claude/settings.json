@@ -1,0 +1,58 @@
+﻿{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "includeGitInstructions": true,
+  "language": "spanish",
+  "permissions": {
+    "allow": [
+      "Read(./CLAUDE.md)",
+      "Read(./docs/**)",
+      "Read(./frontend/**)",
+      "Read(./backend/**)",
+      "Edit(./CLAUDE.md)",
+      "Edit(./docs/**)",
+      "Edit(./frontend/**)",
+      "Edit(./backend/**)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(npm.cmd ci)",
+      "Bash(npm.cmd install)",
+      "Bash(npm.cmd run build)",
+      "Bash(npm.cmd run dev)",
+      "Bash(npm.cmd test)",
+      "Bash(npx prisma validate)",
+      "Bash(npx prisma migrate dev *)",
+      "Bash(npx prisma studio)"
+    ],
+    "ask": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npm.cmd install *)",
+      "Bash(npm.cmd audit *)",
+      "Bash(npx prisma migrate reset *)",
+      "Bash(npx prisma db push *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./backend/.env)",
+      "Read(./backend/.env.*)",
+      "Read(./frontend/.env)",
+      "Read(./frontend/.env.*)",
+      "Read(./backend/uploads/evidences/**)",
+      "Read(./node_modules/**)",
+      "Read(./frontend/node_modules/**)",
+      "Read(./backend/node_modules/**)",
+      "Read(./frontend/dist/**)",
+      "Read(./backend/dist/**)",
+      "Bash(rm *)",
+      "Bash(del *)",
+      "Bash(rmdir *)",
+      "Bash(Remove-Item *)",
+      "Bash(git reset *)",
+      "Bash(git clean *)",
+      "Bash(npm.cmd audit fix --force *)"
+    ]
+  }
+}
