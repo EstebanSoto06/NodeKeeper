@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+}
+
+enum NodeStatus {
+  AVAILABLE
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum EquipmentStatus {
+  OPERATIONAL
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                      String          @id @default(cuid())
+  name                    String
+  email                   String          @unique
+  passwordHash            String
+  role                    UserRole        @default(OPERATOR)
+  isActive                Boolean         @default(true)
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  createdMaintenances     Maintenance[]   @relation("MaintenanceCreatedBy")
+  startedMaintenances     Maintenance[]   @relation("MaintenanceStartedBy")
+  closedMaintenances      Maintenance[]   @relation("MaintenanceClosedBy")
+  completedChecklistTasks ChecklistTask[] @relation("ChecklistTaskCompletedBy")
+  evidences               Evidence[]      @relation("EvidenceUploadedBy")
+}
+
+model NetworkNode {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  location     String?
+  latitude     Float?
+  longitude    Float?
+  status       NodeStatus    @default(AVAILABLE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  equipment    Equipment[]
+  maintenances Maintenance[]
+}
+
+model Equipment {
+  id                String           @id @default(cuid())
+  name              String
+  category          String
+  serialNumber      String?          @unique
+  status            EquipmentStatus  @default(OPERATIONAL)
+  networkNodeId     String
+  supportProviderId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  networkNode       NetworkNode      @relation(fields: [networkNodeId], references: [id], onDelete: Cascade)
+  supportProvider   SupportProvider? @relation(fields: [supportProviderId], references: [id], onDelete: SetNull)
+  maintenances      Maintenance[]
+}
+
+model SupportProvider {
+  id            String      @id @default(cuid())
+  companyName   String
+  supportPhone  String
+  supportEmail  String
+  contactName   String
+  contactPhone  String
+  contactEmail  String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  equipment      Equipment[]
+}
+
+model Maintenance {
+  id             String             @id @default(cuid())
+  title          String
+  description    String?
+  type           MaintenanceType
+  status         MaintenanceStatus  @default(SCHEDULED)
+  scheduledDate  DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  networkNodeId  String?
+  equipmentId    String?
+  createdById    String?
+  startedById    String?
+  closedById     String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  networkNode    NetworkNode?       @relation(fields: [networkNodeId], references: [id], onDelete: Cascade)
+  equipment      Equipment?         @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  createdBy      User?              @relation("MaintenanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  startedBy      User?              @relation("MaintenanceStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
+  closedBy       User?              @relation("MaintenanceClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  checklistTasks ChecklistTask[]
+  evidences      Evidence[]
+}
+
+model ChecklistTask {
+  id             String       @id @default(cuid())
+  maintenanceId  String
+  description    String
+  isCompleted    Boolean      @default(false)
+  completedAt    DateTime?
+  completedById  String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  maintenance    Maintenance  @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
+  completedBy    User?        @relation("ChecklistTaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+}
+
+model Evidence {
+  id            String       @id @default(cuid())
+  maintenanceId String
+  uploadedById  String?
+  originalName  String
+  storedName    String
+  mimeType      String
+  sizeBytes     Int
+  relativePath  String
+  createdAt     DateTime     @default(now())
+
+  maintenance   Maintenance  @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
+  uploadedBy    User?        @relation("EvidenceUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+}
