@@ -12,14 +12,28 @@ const prisma = new PrismaClient({
   adapter,
 });
 
+function getRequiredEnv(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
 async function main() {
-  const adminPasswordHash = await bcrypt.hash("Admin123!", 10);
-  const operatorPasswordHash = await bcrypt.hash("Operator123!", 10);
+  const adminPassword = getRequiredEnv("SEED_ADMIN_PASSWORD");
+  const operatorPassword = getRequiredEnv("SEED_OPERATOR_PASSWORD");
+
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+  const operatorPasswordHash = await bcrypt.hash(operatorPassword, 10);
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@nodekeeper.local" },
     update: {
       name: "Administrador NodeKeeper",
+      passwordHash: adminPasswordHash,
       role: "ADMIN",
       isActive: true,
     },
@@ -36,6 +50,7 @@ async function main() {
     where: { email: "operador@nodekeeper.local" },
     update: {
       name: "Operador NodeKeeper",
+      passwordHash: operatorPasswordHash,
       role: "OPERATOR",
       isActive: true,
     },
@@ -202,8 +217,8 @@ async function main() {
   console.log("Seed completed successfully.");
   console.log("");
   console.log("Test users:");
-  console.log("- admin@nodekeeper.local / Admin123!");
-  console.log("- operador@nodekeeper.local / Operator123!");
+  console.log("- admin@nodekeeper.local / configured in SEED_ADMIN_PASSWORD");
+  console.log("- operador@nodekeeper.local / configured in SEED_OPERATOR_PASSWORD");
   console.log("");
   console.log("Created records:");
   console.log(`- Users: ${admin.email}, ${operator.email}`);
