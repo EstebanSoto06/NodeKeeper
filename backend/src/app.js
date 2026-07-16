@@ -6,6 +6,9 @@ import morgan from "morgan";
 import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import supportProviderRoutes from "./modules/support-providers/support-provider.routes.js";
+import networkNodeRoutes from "./modules/network-nodes/network-node.routes.js";
+import equipmentRoutes from "./modules/equipment/equipment.routes.js";
 import healthRoutes from "./routes/health.routes.js";
 
 const app = express();
@@ -35,6 +38,9 @@ app.get("/", (req, res) => {
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/support-providers", supportProviderRoutes);
+app.use("/api/network-nodes", networkNodeRoutes);
+app.use("/api/equipment", equipmentRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
