@@ -9,6 +9,7 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import supportProviderRoutes from "./modules/support-providers/support-provider.routes.js";
 import networkNodeRoutes from "./modules/network-nodes/network-node.routes.js";
 import equipmentRoutes from "./modules/equipment/equipment.routes.js";
+import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
 import healthRoutes from "./routes/health.routes.js";
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/support-providers", supportProviderRoutes);
 app.use("/api/network-nodes", networkNodeRoutes);
 app.use("/api/equipment", equipmentRoutes);
+app.use("/api/maintenances", maintenanceRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
