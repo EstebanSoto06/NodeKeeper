@@ -10,6 +10,7 @@ import supportProviderRoutes from "./modules/support-providers/support-provider.
 import networkNodeRoutes from "./modules/network-nodes/network-node.routes.js";
 import equipmentRoutes from "./modules/equipment/equipment.routes.js";
 import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
+import checklistTaskRoutes from "./modules/checklist-tasks/checklist-task.routes.js";
 import healthRoutes from "./routes/health.routes.js";
 
 const app = express();
@@ -43,6 +44,10 @@ app.use("/api/support-providers", supportProviderRoutes);
 app.use("/api/network-nodes", networkNodeRoutes);
 app.use("/api/equipment", equipmentRoutes);
 app.use("/api/maintenances", maintenanceRoutes);
+app.use(
+  "/api/maintenances/:maintenanceId/checklist-tasks",
+  checklistTaskRoutes,
+);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
