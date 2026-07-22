@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { createHttpError } from "../../utils/http-error.js";
+import { runSerializableTransaction } from "../../utils/serializable-transaction.js";
 
 const relatedUserSelect = {
   select: {
@@ -140,7 +141,19 @@ export async function completeMaintenance(id, userId) {
   // transaccion. La transicion IN_PROGRESS -> COMPLETED se hace condicionada
   // por id + status, de modo que dos "complete" simultaneos no puedan cerrar
   // el mismo mantenimiento dos veces (la segunda encuentra 0 filas).
-  const outcome = await prisma.$transaction(async (tx) => {
+  //
+  // Se usa aislamiento Serializable (via runSerializableTransaction) y no
+  // solo la transaccion por defecto: esta funcion LEE ChecklistTask (el
+  // conteo de pendientes) y luego ESCRIBE Maintenance, mientras que
+  // checklist-task.service.js LEE Maintenance.status y luego ESCRIBE
+  // ChecklistTask. Esas dos direcciones cruzadas forman un ciclo de
+  // dependencias real: si un PATCH de estado de una tarea reabre la
+  // checklist justo despues de que este conteo la vio completa, pero antes
+  // de que el UPDATE de abajo confirme, el mantenimiento podria quedar
+  // COMPLETED con una tarea pendiente. PostgreSQL solo detecta y aborta ese
+  // ciclo si AMBOS lados corren en Serializable (con READ COMMITTED, un lado
+  // no participa en la deteccion y el ciclo puede colarse sin error).
+  const outcome = await runSerializableTransaction(async (tx) => {
     const maintenance = await tx.maintenance.findUnique({
       where: { id },
       select: { id: true, status: true },
