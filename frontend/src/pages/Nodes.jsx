@@ -1,64 +1,83 @@
-/* Listado de nodos: búsqueda, filtros por estado (semáforo) y acceso al detalle. */
+/* Listado de nodos, conectado a GET/POST/PUT/DELETE /network-nodes.
+   ADMIN puede crear/editar/eliminar; OPERATOR consulta. */
 import { useState } from 'react';
-import { DATA, NK } from '../data/mockData.js';
-import { PageHeader, Empty } from '../components/Misc.jsx';
+import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '../components/Misc.jsx';
 import { Button } from '../components/Button.jsx';
 import { Card } from '../components/Card.jsx';
-import { SearchInput, FilterChips } from '../components/Inputs.jsx';
-import { StatusPill, HealthDot } from '../components/StatusPill.jsx';
 import { Icon } from '../components/Icon.jsx';
+import { SearchInput, FilterChips } from '../components/Inputs.jsx';
+import { LoadingSkeleton } from '../components/LoadingSkeleton.jsx';
+import { ErrorState } from '../components/ErrorState.jsx';
+import { EmptyState } from '../components/EmptyState.jsx';
+import { StatusBadge } from '../components/StatusBadge.jsx';
+import { NodeFormModal } from '../components/NodeFormModal.jsx';
+import { useAsync } from '../hooks/useAsync.js';
+import { usePermissions } from '../hooks/usePermissions.js';
+import * as networkNodeService from '../services/networkNodeService.js';
 
-export function Nodes({ go }) {
+const STATUS_FILTERS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'AVAILABLE', label: 'Disponible', dot: 'var(--green-600)' },
+  { value: 'MAINTENANCE', label: 'En mantenimiento', dot: 'var(--amber-500)' },
+  { value: 'OUT_OF_SERVICE', label: 'Fuera de servicio', dot: 'var(--red-600)' },
+];
+
+export function Nodes() {
+  const navigate = useNavigate();
+  const { isAdmin } = usePermissions();
+  const { data, error, loading, reload } = useAsync(() => networkNodeService.list(), []);
+  const nodes = data?.networkNodes ?? [];
+
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState('all');
-  const filters = [
-    { value: 'all', label: 'Todos' },
-    { value: 'red', label: 'Pendientes', dot: 'var(--red-600)' },
-    { value: 'amber', label: 'Incompletos', dot: 'var(--amber-500)' },
-    { value: 'green', label: 'Al día', dot: 'var(--green-600)' },
-  ];
-  const rows = DATA.nodes.filter((n) =>
-    (filter === 'all' || n.health === filter) &&
-    (q === '' || (n.name + n.code + n.city + n.locality).toLowerCase().includes(q.toLowerCase())));
+  const [status, setStatus] = useState('all');
+  const [formNode, setFormNode] = useState(undefined); // undefined=cerrado, null=crear, obj=editar
+
+  const rows = nodes.filter((n) =>
+    (status === 'all' || n.status === status) &&
+    (q === '' || (n.name + n.code + (n.location || '')).toLowerCase().includes(q.toLowerCase())));
 
   return (
     <div>
       <PageHeader eyebrow="Infraestructura" title="Nodos"
-        subtitle={`${DATA.nodes.length} nodos · ${DATA.nodes.filter((n) => n.health === 'red').length} con pendientes`}
+        subtitle={`${nodes.length} nodos registrados`}
         actions={(
           <>
-            <Button variant="secondary" icon="map" onClick={() => go('map')}>Ver en mapa</Button>
-            <Button variant="primary" icon="plus">Crear nodo</Button>
+            <Button variant="secondary" icon="map" onClick={() => navigate('/mapa')}>Ver en mapa</Button>
+            {isAdmin && <Button variant="primary" icon="plus" onClick={() => setFormNode(null)}>Crear nodo</Button>}
           </>
         )} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <SearchInput value={q} onChange={setQ} placeholder="Buscar nodo, código o localidad…" style={{ flex: 1, minWidth: 240 }} />
-        <FilterChips options={filters} value={filter} onChange={setFilter} />
-        <Button variant="secondary" icon="sliders-horizontal" size="md">Filtros</Button>
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar nodo, código o ubicación…" style={{ flex: 1, minWidth: 240 }} />
+        <FilterChips options={STATUS_FILTERS} value={status} onChange={setStatus} />
       </div>
       <Card pad={false}>
-        <table className="nk-table">
-          <thead><tr><th></th><th>Código</th><th>Nodo</th><th>Localidad</th><th>Equipos</th><th>Estado</th><th></th></tr></thead>
-          <tbody>
-            {rows.map((n) => (
-              <tr key={n.id} onClick={() => go('node-detail', n.id)}>
-                <td style={{ width: 8, paddingRight: 0 }}><HealthDot health={n.health} size={10} /></td>
-                <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{n.code}</td>
-                <td style={{ fontWeight: 600 }}>{n.name}</td>
-                <td style={{ color: 'var(--fg-2)' }}>{n.city} · {n.locality}</td>
-                <td className="nk-mono" style={{ color: 'var(--fg-3)' }}>{n.equip}</td>
-                <td>
-                  {n.health === 'red'
-                    ? <StatusPill state={{ ...NK.health.red, label: `${n.pending} pendientes` }} />
-                    : <StatusPill state={NK.health[n.health]} />}
-                </td>
-                <td style={{ textAlign: 'right', color: 'var(--fg-3)' }}><Icon name="chevron-right" size={16} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && <Empty icon="search-x" title="Sin resultados" sub="Ajusta la búsqueda o los filtros." />}
+        {loading && <div style={{ padding: 20 }}><LoadingSkeleton lines={4} /></div>}
+        {!loading && error && <ErrorState error={error} onRetry={reload} />}
+        {!loading && !error && (
+          <table className="nk-table">
+            <thead><tr><th>Código</th><th>Nodo</th><th>Ubicación</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {rows.map((n) => (
+                <tr key={n.id} onClick={() => navigate(`/nodos/${n.id}`)}>
+                  <td className="nk-mono" style={{ color: 'var(--fg-2)' }}>{n.code}</td>
+                  <td style={{ fontWeight: 600 }}>{n.name}</td>
+                  <td style={{ color: 'var(--fg-2)' }}>{n.location || '—'}</td>
+                  <td><StatusBadge kind="node" value={n.status} /></td>
+                  <td style={{ textAlign: 'right', color: 'var(--fg-3)' }}><Icon name="chevron-right" size={16} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {!loading && !error && rows.length === 0 && (
+          <EmptyState icon="search-x" title="Sin resultados" subtitle="Ajusta la búsqueda o los filtros." />
+        )}
       </Card>
+
+      {formNode !== undefined && (
+        <NodeFormModal node={formNode} onClose={() => setFormNode(undefined)} onSaved={reload} />
+      )}
     </div>
   );
 }

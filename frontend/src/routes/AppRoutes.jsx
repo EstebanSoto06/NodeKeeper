@@ -38,44 +38,6 @@ function DashboardRoute() {
   return <Dashboard go={go} role={role} />;
 }
 
-function NodesRoute() {
-  const go = useLegacyGo();
-  return <Nodes go={go} />;
-}
-
-function NodeDetailRoute() {
-  const { id } = useParams();
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <NodeDetail id={id} go={go} role={role} />;
-}
-
-function EquipmentRoute() {
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <Equipment go={go} role={role} />;
-}
-
-function EquipmentDetailRoute() {
-  const { id } = useParams();
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <EquipmentDetail id={id} go={go} role={role} />;
-}
-
-function ProvidersRoute() {
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <Providers go={go} role={role} />;
-}
-
-function ProviderDetailRoute() {
-  const { id } = useParams();
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <ProviderDetail id={id} go={go} role={role} />;
-}
-
 function MaintenancesRoute() {
   const go = useLegacyGo();
   const role = useLegacyRole();
@@ -117,12 +79,12 @@ export function AppRoutes() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardRoute />} />
-          <Route path="/nodos" element={<NodesRoute />} />
-          <Route path="/nodos/:id" element={<NodeDetailRoute />} />
-          <Route path="/equipos" element={<EquipmentRoute />} />
-          <Route path="/equipos/:id" element={<EquipmentDetailRoute />} />
-          <Route path="/proveedores" element={<ProvidersRoute />} />
-          <Route path="/proveedores/:id" element={<ProviderDetailRoute />} />
+          <Route path="/nodos" element={<Nodes />} />
+          <Route path="/nodos/:id" element={<NodeDetail />} />
+          <Route path="/equipos" element={<Equipment />} />
+          <Route path="/equipos/:id" element={<EquipmentDetail />} />
+          <Route path="/proveedores" element={<Providers />} />
+          <Route path="/proveedores/:id" element={<ProviderDetail />} />
           <Route path="/mantenimientos" element={<MaintenancesRoute />} />
           <Route path="/mantenimientos/:id" element={<MaintenanceDetailRoute />} />
           <Route path="/calendario" element={<CalendarRoute />} />
