@@ -1,15 +1,14 @@
 /* Arbol de rutas reales de la aplicacion. Todas las pantallas de negocio
-   (Proveedores, Nodos, Equipos, Mantenimientos, Dashboard, Calendario, Mapa
-   y Reportes) estan conectadas a la API real; ninguna depende ya de
-   mockData.js ni de legacyNav.js (retirado: sin consumidores).
+   (Usuarios, Proveedores, Nodos, Equipos, Mantenimientos, Dashboard,
+   Calendario, Mapa y Reportes) estan conectadas a la API real; ninguna
+   depende ya de mockData.js ni de legacyNav.js (retirado: sin consumidores).
 
-   Dos rutas se apartan a proposito del mock para no fingir funcionalidad que
-   el backend no tiene:
-   - /usuarios: ADMIN-only y marcada como "Requiere modulo backend" (no hay
-     CRUD de usuarios en el backend). Un OPERATOR que entre por URL ve
-     AccessDenied (via ProtectedRoute roles).
-   - /evidencias: no existe galeria global en el backend; muestra una pantalla
-     informativa que enlaza a Mantenimientos (donde viven las evidencias). */
+   /usuarios es ADMIN-only: OPERATOR (o navegacion directa por URL) ve
+   AccessDenied gracias a la guarda de rol, y el Sidebar ya oculta el enlace
+   para ese rol.
+   /evidencias no expone una galeria global (el backend no tiene ese
+   endpoint): muestra una pantalla informativa que enlaza a Mantenimientos
+   (donde viven las evidencias reales, dentro de cada orden). */
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell.jsx';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
@@ -27,18 +26,8 @@ import { MaintenanceDetail } from '../pages/MaintenanceDetail.jsx';
 import { Calendar } from '../pages/Calendar.jsx';
 import { Map } from '../pages/Map.jsx';
 import { Reports } from '../pages/Reports.jsx';
+import { Users } from '../pages/Users.jsx';
 import { EvidencesInfo } from '../pages/EvidencesInfo.jsx';
-import { ComingSoon } from '../components/ComingSoon.jsx';
-
-function UsersRoute() {
-  return (
-    <ComingSoon
-      title="Usuarios y roles"
-      message="La gestion de usuarios y roles estara disponible cuando se agregue el modulo correspondiente en el backend. Por ahora esta seccion no administra datos reales."
-      icon="users"
-    />
-  );
-}
 
 export function AppRoutes() {
   return (
@@ -65,7 +54,7 @@ export function AppRoutes() {
           {/* /usuarios: solo ADMIN; OPERATOR (o navegacion directa por URL) ve
               AccessDenied gracias a la guarda de rol. */}
           <Route element={<ProtectedRoute roles={['ADMIN']} />}>
-            <Route path="/usuarios" element={<UsersRoute />} />
+            <Route path="/usuarios" element={<Users />} />
           </Route>
         </Route>
       </Route>

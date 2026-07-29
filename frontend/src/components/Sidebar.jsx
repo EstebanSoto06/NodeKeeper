@@ -1,14 +1,15 @@
 /* Barra lateral navy. Navegación principal + secciones por permiso de rol.
    El Operador no ve la sección Administración (Usuarios y roles).
-   Fase 1+2: los items usan NavLink (URL real, resaltado automático de la
-   ruta activa) y el usuario/rol provienen de la sesión real (AuthContext)
-   en vez de props locales. El badge de pendientes sigue leyendo el mock de
-   mantenimientos hasta que ese módulo se conecte a la API real. */
+   Los items usan NavLink (URL real, resaltado automático de la ruta activa)
+   y el usuario/rol provienen de la sesión real (AuthContext). El badge de
+   mantenimientos pendientes es real (GET /maintenances, conteo de
+   SCHEDULED), ya sin depender de mockData.js. */
 import { NavLink } from 'react-router-dom';
 import { Icon, Logo } from './Icon.jsx';
 import { Avatar } from './Misc.jsx';
-import { DATA } from '../data/mockData.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useAsync } from '../hooks/useAsync.js';
+import * as maintenanceService from '../services/maintenanceService.js';
 
 const NAV_MAIN = [
   { to: '/dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
@@ -38,7 +39,8 @@ function initialsFromName(name) {
 export function Sidebar({ open, onClose }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-  const pendientes = DATA.maint.filter((m) => m.state === 'pendiente').length;
+  const { data } = useAsync(() => maintenanceService.list(), []);
+  const pendientes = (data?.maintenances ?? []).filter((m) => m.status === 'SCHEDULED').length;
 
   const item = (n) => (
     <NavLink
