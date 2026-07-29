@@ -1,8 +1,13 @@
-/* Barra superior: hamburguesa (responsive), buscador, acción rápida, rol y salir. */
+/* Barra superior: hamburguesa (responsive), buscador, acción rápida, rol y salir.
+   Fase 2: el rol y el logout provienen de la sesión real (AuthContext). */
 import { Icon } from './Icon.jsx';
 import { IconButton } from './Button.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
-export function Topbar({ onMenu, role, onLogout }) {
+export function Topbar({ onMenu }) {
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
     <header className="nk-topbar">
       <button className="nk-iconbtn nk-hamburger" onClick={onMenu}><Icon name="menu" size={20} /></button>
@@ -13,10 +18,10 @@ export function Topbar({ onMenu, role, onLogout }) {
       <div style={{ flex: 1 }}></div>
       <button className="nk-btn nk-btn-secondary nk-btn-sm"><Icon name="plus" size={15} /><span>Nuevo</span></button>
       <IconButton name="bell" title="Notificaciones" />
-      <span className="nk-pill" style={{ background: role === 'admin' ? 'var(--blue-50)' : 'var(--gray-100)', color: role === 'admin' ? 'var(--blue-700)' : 'var(--gray-600)' }}>
-        {role === 'admin' ? 'Administrador' : 'Operador'}
+      <span className="nk-pill" style={{ background: isAdmin ? 'var(--blue-50)' : 'var(--gray-100)', color: isAdmin ? 'var(--blue-700)' : 'var(--gray-600)' }}>
+        {isAdmin ? 'Administrador' : 'Operador'}
       </span>
-      <IconButton name="log-out" title="Salir" onClick={onLogout} />
+      <IconButton name="log-out" title="Salir" onClick={logout} />
     </header>
   );
 }

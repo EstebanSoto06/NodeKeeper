@@ -1,47 +1,58 @@
 /* Barra lateral navy. Navegación principal + secciones por permiso de rol.
-   El Operador no ve la sección Administración (Usuarios y roles). */
+   El Operador no ve la sección Administración (Usuarios y roles).
+   Fase 1+2: los items usan NavLink (URL real, resaltado automático de la
+   ruta activa) y el usuario/rol provienen de la sesión real (AuthContext)
+   en vez de props locales. El badge de pendientes sigue leyendo el mock de
+   mantenimientos hasta que ese módulo se conecte a la API real. */
+import { NavLink } from 'react-router-dom';
 import { Icon, Logo } from './Icon.jsx';
 import { Avatar } from './Misc.jsx';
 import { DATA } from '../data/mockData.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const NAV_MAIN = [
-  { key: 'dashboard',    label: 'Dashboard',      icon: 'layout-dashboard' },
-  { key: 'nodes',        label: 'Nodos',          icon: 'share-2' },
-  { key: 'equipment',    label: 'Equipos',        icon: 'server' },
-  { key: 'providers',    label: 'Proveedores',    icon: 'building-2' },
-  { key: 'maintenances', label: 'Mantenimientos', icon: 'wrench', badge: true },
-  { key: 'calendar',     label: 'Calendario',     icon: 'calendar-days' },
-  { key: 'map',          label: 'Mapa',           icon: 'map' },
+  { to: '/dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+  { to: '/nodos', label: 'Nodos', icon: 'share-2' },
+  { to: '/equipos', label: 'Equipos', icon: 'server' },
+  { to: '/proveedores', label: 'Proveedores', icon: 'building-2' },
+  { to: '/mantenimientos', label: 'Mantenimientos', icon: 'wrench', badge: true },
+  { to: '/calendario', label: 'Calendario', icon: 'calendar-days' },
+  { to: '/mapa', label: 'Mapa', icon: 'map' },
 ];
 const NAV_DATA = [
-  { key: 'evidence', label: 'Evidencias', icon: 'image' },
-  { key: 'reports',  label: 'Reportes',   icon: 'bar-chart-3' },
+  { to: '/evidencias', label: 'Evidencias', icon: 'image' },
+  { to: '/reportes', label: 'Reportes', icon: 'bar-chart-3' },
 ];
 const NAV_ADMIN = [
-  { key: 'users', label: 'Usuarios y roles', icon: 'users' },
+  { to: '/usuarios', label: 'Usuarios y roles', icon: 'users' },
 ];
 
-export function Sidebar({ view, go, role, open, onClose }) {
-  const pendientes = DATA.maint.filter((m) => m.state === 'pendiente').length;
-  const me = role === 'admin'
-    ? DATA.users.find((u) => u.role === 'Administrador')
-    : DATA.users.find((u) => u.role === 'Operador');
+function initialsFromName(name) {
+  if (!name) return '??';
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] || '';
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
 
-  const item = (n) => {
-    const active = view === n.key
-      || (view === 'node-detail' && n.key === 'nodes')
-      || (view === 'equipment-detail' && n.key === 'equipment')
-      || (view === 'provider-detail' && n.key === 'providers')
-      || (view === 'maint-detail' && n.key === 'maintenances');
-    return (
-      <button key={n.key} className={`nk-navitem ${active ? 'is-active' : ''}`}
-        onClick={() => { go(n.key); onClose && onClose(); }}>
-        <Icon name={n.icon} size={17} />
-        <span>{n.label}</span>
-        {n.badge && pendientes > 0 && <span className="nk-badge">{pendientes}</span>}
-      </button>
-    );
-  };
+export function Sidebar({ open, onClose }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const pendientes = DATA.maint.filter((m) => m.state === 'pendiente').length;
+
+  const item = (n) => (
+    <NavLink
+      key={n.to}
+      to={n.to}
+      className={({ isActive }) => `nk-navitem ${isActive ? 'is-active' : ''}`}
+      style={{ textDecoration: 'none' }}
+      onClick={() => onClose && onClose()}
+    >
+      <Icon name={n.icon} size={17} />
+      <span>{n.label}</span>
+      {n.badge && pendientes > 0 && <span className="nk-badge">{pendientes}</span>}
+    </NavLink>
+  );
 
   return (
     <aside className={`nk-sidebar ${open ? 'is-open' : ''}`}>
@@ -51,7 +62,7 @@ export function Sidebar({ view, go, role, open, onClose }) {
         {NAV_MAIN.map(item)}
         <div className="nk-side-section">Datos</div>
         {NAV_DATA.map(item)}
-        {role === 'admin' && (
+        {isAdmin && (
           <>
             <div className="nk-side-section">Administración</div>
             {NAV_ADMIN.map(item)}
@@ -59,10 +70,10 @@ export function Sidebar({ view, go, role, open, onClose }) {
         )}
       </nav>
       <div className="nk-side-user">
-        <Avatar initials={me.initials} color={me.color} size={34} />
+        <Avatar initials={initialsFromName(user?.name)} size={34} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="nm">{me.name}</div>
-          <div className="rl">{role === 'admin' ? 'Administrador' : 'Operador'}</div>
+          <div className="nm">{user?.name}</div>
+          <div className="rl">{isAdmin ? 'Administrador' : 'Operador'}</div>
         </div>
         <Icon name="settings" size={16} style={{ color: 'var(--fg-on-dark-2)' }} />
       </div>
