@@ -15,7 +15,11 @@
      Ademas, subir/eliminar requiere que el mantenimiento este IN_PROGRESS. */
 import { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { canManageEvidence, canManageChecklist } from '../utils/maintenanceState.js';
+import {
+  canManageEvidence,
+  canManageChecklist,
+  canManageChecklistStructure,
+} from '../utils/maintenanceState.js';
 
 export function usePermissions() {
   const { user } = useAuth();
@@ -59,8 +63,15 @@ export function usePermissions() {
       canDeleteEvidenceFor(status) {
         return isAdmin && canManageEvidence(status);
       },
-      canEditChecklistFor(status) {
-        return isAdmin && canManageChecklist(status);
+      /* Estructura del checklist (crear/editar/eliminar tareas): solo ADMIN,
+         solo con el mantenimiento SCHEDULED. */
+      canManageChecklistStructureFor(status) {
+        return isAdmin && canManageChecklistStructure(status);
+      },
+      /* Marcar/desmarcar una tarea (PATCH de estado): ADMIN u OPERATOR, solo
+         con el mantenimiento IN_PROGRESS. */
+      canToggleChecklistFor(status) {
+        return isAuthenticated && canManageChecklist(status);
       },
     };
   }, [role]);
