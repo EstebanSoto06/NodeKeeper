@@ -19,4 +19,7 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "8h",
   uploadDir: process.env.UPLOAD_DIR || "uploads/evidences",
   maxFileSizeMb: Number(process.env.MAX_FILE_SIZE_MB || 10),
+  maxEvidencesPerMaintenance: Number(
+    process.env.MAX_EVIDENCES_PER_MAINTENANCE || 20,
+  ),
 };
