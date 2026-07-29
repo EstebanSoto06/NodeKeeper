@@ -493,3 +493,12 @@ button { font-family: inherit; }
   .nk-modal { background: rgba(255,255,255,0.97); }
   .nk-toast { background: rgba(255,255,255,0.98); }
 }
+
+/* Vista imprimible (Reportes): oculta el chrome de la app y cualquier
+   elemento marcado .no-print, dejando solo el contenido del reporte para
+   imprimir/guardar como PDF con el dialogo nativo del navegador. */
+@media print {
+  .nk-sidebar, .nk-topbar, .nk-scrim, .no-print { display: none !important; }
+  .nk-app, .nk-main, .nk-content, .nk-content-inner { display: block !important; height: auto !important; overflow: visible !important; }
+  body { background: #fff !important; }
+}

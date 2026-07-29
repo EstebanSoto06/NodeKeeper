@@ -1,8 +1,7 @@
-/* Arbol de rutas reales de la aplicacion. Las pantallas de negocio del
-   prototipo se montan tal cual (siguen mostrando su contenido mock en esta
-   fase, se conectan modulo a modulo despues); lo nuevo es que ahora son
-   alcanzables por URL, con proteccion de sesion y de rol, y soporte de
-   recarga/back-forward del navegador.
+/* Arbol de rutas reales de la aplicacion. Todas las pantallas de negocio
+   (Proveedores, Nodos, Equipos, Mantenimientos, Dashboard, Calendario, Mapa
+   y Reportes) estan conectadas a la API real; ninguna depende ya de
+   mockData.js ni de legacyNav.js (retirado: sin consumidores).
 
    Dos rutas se apartan a proposito del mock para no fingir funcionalidad que
    el backend no tiene:
@@ -14,7 +13,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell.jsx';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
-import { useLegacyGo, useLegacyRole } from './legacyNav.js';
 import { Login } from '../pages/Login.jsx';
 import { NotFound } from '../pages/NotFound.jsx';
 import { Dashboard } from '../pages/Dashboard.jsx';
@@ -31,22 +29,6 @@ import { Map } from '../pages/Map.jsx';
 import { Reports } from '../pages/Reports.jsx';
 import { EvidencesInfo } from '../pages/EvidencesInfo.jsx';
 import { ComingSoon } from '../components/ComingSoon.jsx';
-
-function DashboardRoute() {
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <Dashboard go={go} role={role} />;
-}
-
-function CalendarRoute() {
-  const go = useLegacyGo();
-  return <Calendar go={go} />;
-}
-
-function MapRoute() {
-  const go = useLegacyGo();
-  return <Map go={go} />;
-}
 
 function UsersRoute() {
   return (
@@ -66,7 +48,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardRoute />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/nodos" element={<Nodes />} />
           <Route path="/nodos/:id" element={<NodeDetail />} />
           <Route path="/equipos" element={<Equipment />} />
@@ -75,8 +57,8 @@ export function AppRoutes() {
           <Route path="/proveedores/:id" element={<ProviderDetail />} />
           <Route path="/mantenimientos" element={<Maintenances />} />
           <Route path="/mantenimientos/:id" element={<MaintenanceDetail />} />
-          <Route path="/calendario" element={<CalendarRoute />} />
-          <Route path="/mapa" element={<MapRoute />} />
+          <Route path="/calendario" element={<Calendar />} />
+          <Route path="/mapa" element={<Map />} />
           <Route path="/evidencias" element={<EvidencesInfo />} />
           <Route path="/reportes" element={<Reports />} />
 
