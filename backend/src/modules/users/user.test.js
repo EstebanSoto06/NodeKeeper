@@ -302,3 +302,164 @@ describe("User management routes", () => {
     }
   });
 });
+
+// Aisla el conteo de administradores activos a exactamente los ids dados,
+// desactivando temporalmente (via Prisma, fuera de la API) a cualquier otro
+// admin activo preexistente (p. ej. el admin sembrado), y restaurandolos al
+// terminar. Necesario para que las aserciones de las pruebas de
+// concurrencia ("debe quedar exactamente 1 admin activo") sean
+// deterministas sin depender de cuantos administradores existan ya en la
+// base de datos.
+async function withExactlyTheseAdminsActive(keepIds, fn) {
+  const others = await prisma.user.findMany({
+    where: { role: "ADMIN", isActive: true, id: { notIn: keepIds } },
+    select: { id: true },
+  });
+  const otherIds = others.map((u) => u.id);
+
+  if (otherIds.length > 0) {
+    await prisma.user.updateMany({
+      where: { id: { in: otherIds } },
+      data: { isActive: false },
+    });
+  }
+
+  try {
+    return await fn();
+  } finally {
+    if (otherIds.length > 0) {
+      await prisma.user.updateMany({
+        where: { id: { in: otherIds } },
+        data: { isActive: true },
+      });
+    }
+  }
+}
+
+describe("Active admin invariant under concurrency", () => {
+  it("allows only one of two concurrent mutual role-demotions to succeed, and never leaves zero active admins", async () => {
+    // CASO 1: dos administradores activos (y solo ellos dos, mientras dura
+    // la prueba) intentan degradarse mutuamente de ADMIN a OPERATOR al mismo
+    // tiempo. Sin Serializable, cada peticion podria ver "queda el otro
+    // admin activo" y ambas completar, dejando cero administradores; con
+    // Serializable, PostgreSQL detecta la dependencia cruzada (write skew) y
+    // aborta una de las dos, que runSerializableTransaction reintenta y que
+    // en el reintento ve el estado ya actualizado por la otra.
+    //
+    // La peticion rechazada puede llegar como 409 (bloqueada por la regla de
+    // negocio o por reintentos de serializacion agotados) O como 403: si la
+    // OTRA peticion ya confirmo y le quito el rol ADMIN al actor de esta,
+    // el middleware authenticate() -que relee el usuario en cada peticion-
+    // la rechaza como Forbidden antes de llegar a la logica de negocio. Es
+    // una capa de defensa adicional legitima, no una falla: en ambos casos
+    // la operacion se rechaza y el invariante se conserva.
+    const adminToken = await loginAs("admin@nodekeeper.local", adminPassword);
+    const createdA = await createTestUser(adminToken, { role: "ADMIN" });
+    const createdB = await createTestUser(adminToken, { role: "ADMIN" });
+    const a = createdA.body.data.user;
+    const b = createdB.body.data.user;
+
+    await withExactlyTheseAdminsActive([a.id, b.id], async () => {
+      const tokenA = await loginAs(a.email, "Password123!");
+      const tokenB = await loginAs(b.email, "Password123!");
+
+      const [respA, respB] = await Promise.all([
+        request(app)
+          .patch(`/api/users/${b.id}`)
+          .set("Authorization", `Bearer ${tokenA}`)
+          .send({ name: b.name, email: b.email, role: "OPERATOR" }),
+        request(app)
+          .patch(`/api/users/${a.id}`)
+          .set("Authorization", `Bearer ${tokenB}`)
+          .send({ name: a.name, email: a.email, role: "OPERATOR" }),
+      ]);
+
+      const statuses = [respA.status, respB.status];
+      const successCount = statuses.filter((s) => s === 200).length;
+      const rejectedCount = statuses.filter((s) => s === 403 || s === 409).length;
+
+      expect(successCount).toBe(1);
+      expect(rejectedCount).toBe(1);
+      statuses.forEach((s) => expect(s).not.toBe(500));
+
+      const activeAdmins = await prisma.user.count({
+        where: { role: "ADMIN", isActive: true, id: { in: [a.id, b.id] } },
+      });
+      expect(activeAdmins).toBe(1);
+    });
+  });
+
+  it("allows only one of two concurrent operations (role-demote vs deactivate) to succeed when both would zero out active admins, and never returns 500", async () => {
+    // CASO 2: un ADMIN intenta degradar al otro (PATCH /users/:id, cambio de
+    // rol) mientras el segundo intenta desactivar al primero (PATCH
+    // /users/:id/status) al mismo tiempo. Es la misma clase de write skew
+    // que el CASO 1, pero cruzando dos operaciones distintas del servicio
+    // (updateUser y setUserActive) que comparten la misma verificacion de
+    // invariante. Igual que en el CASO 1, la peticion rechazada puede llegar
+    // como 409 (negocio o reintentos agotados) o como 403 (si la otra ya le
+    // quito el rol ADMIN al actor antes de que su propia peticion pase por
+    // authenticate()) -- ambos son desenlaces seguros.
+    const adminToken = await loginAs("admin@nodekeeper.local", adminPassword);
+    const createdA = await createTestUser(adminToken, { role: "ADMIN" });
+    const createdB = await createTestUser(adminToken, { role: "ADMIN" });
+    const a = createdA.body.data.user;
+    const b = createdB.body.data.user;
+
+    await withExactlyTheseAdminsActive([a.id, b.id], async () => {
+      const tokenA = await loginAs(a.email, "Password123!");
+      const tokenB = await loginAs(b.email, "Password123!");
+
+      const [demoteB, deactivateA] = await Promise.all([
+        request(app)
+          .patch(`/api/users/${b.id}`)
+          .set("Authorization", `Bearer ${tokenA}`)
+          .send({ name: b.name, email: b.email, role: "OPERATOR" }),
+        request(app)
+          .patch(`/api/users/${a.id}/status`)
+          .set("Authorization", `Bearer ${tokenB}`)
+          .send({ isActive: false }),
+      ]);
+
+      const statuses = [demoteB.status, deactivateA.status];
+      const successCount = statuses.filter((s) => s === 200).length;
+      const rejectedCount = statuses.filter((s) => s === 403 || s === 409).length;
+
+      statuses.forEach((status) => expect(status).not.toBe(500));
+      expect(successCount).toBe(1);
+      expect(rejectedCount).toBe(1);
+
+      const remainingActiveAdmins = await prisma.user.count({
+        where: { role: "ADMIN", isActive: true, id: { in: [a.id, b.id] } },
+      });
+      expect(remainingActiveAdmins).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("still allows two unrelated concurrent updates that do not threaten the invariant", async () => {
+    // CASO 3: control negativo. Dos OPERATOR distintos editados al mismo
+    // tiempo no tocan en absoluto el predicado role=ADMIN,isActive=true, por
+    // lo que no deberian generar ningun conflicto de serializacion ni verse
+    // afectados por el cambio de esta fase.
+    const adminToken = await loginAs("admin@nodekeeper.local", adminPassword);
+    const createdX = await createTestUser(adminToken, { role: "OPERATOR" });
+    const createdY = await createTestUser(adminToken, { role: "OPERATOR" });
+    const x = createdX.body.data.user;
+    const y = createdY.body.data.user;
+
+    const [respX, respY] = await Promise.all([
+      request(app)
+        .patch(`/api/users/${x.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "Operator X Renamed", email: x.email, role: "OPERATOR" }),
+      request(app)
+        .patch(`/api/users/${y.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "Operator Y Renamed", email: y.email, role: "OPERATOR" }),
+    ]);
+
+    expect(respX.status).toBe(200);
+    expect(respY.status).toBe(200);
+    expect(respX.body.data.user.name).toBe("Operator X Renamed");
+    expect(respY.body.data.user.name).toBe("Operator Y Renamed");
+  });
+});

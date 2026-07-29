@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { createHttpError } from "../../utils/http-error.js";
 import { hashPassword } from "../../utils/password.js";
+import { runSerializableTransaction } from "../../utils/serializable-transaction.js";
 
 // Nunca incluir passwordHash: este select es la unica forma en que este
 // modulo lee usuarios para exponerlos por la API.
@@ -71,7 +72,19 @@ export async function createUser(data) {
 }
 
 export async function updateUser(id, data) {
-  return prisma.$transaction(async (tx) => {
+  // Serializable (no la transaccion por defecto en READ COMMITTED): el
+  // conteo de administradores activos y la escritura posterior tocan un
+  // conjunto de filas que se superpone con el de cualquier otra operacion
+  // concurrente que tambien cambie rol o estado de un ADMIN (updateUser o
+  // setUserActive). Bajo READ COMMITTED, dos de estas operaciones podrian
+  // -cada una viendo "queda al menos otro admin"- degradar/desactivar dos
+  // administradores distintos en paralelo y dejar el sistema con cero
+  // administradores activos (write skew clasico). Serializable hace que
+  // PostgreSQL detecte esa dependencia cruzada y aborte una de las dos
+  // transacciones (SQLSTATE 40001), que runSerializableTransaction ya
+  // reintenta; en el reintento, la relectura de mas abajo ve el estado ya
+  // actualizado por la otra transaccion y decide correctamente.
+  return runSerializableTransaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id } });
 
     if (!user) {
@@ -118,7 +131,11 @@ export async function setUserActive(id, isActive, actorId) {
     throw createHttpError(403, "You cannot deactivate your own account");
   }
 
-  return prisma.$transaction(async (tx) => {
+  // Serializable por la misma razon que en updateUser: esta operacion
+  // tambien puede reducir el conteo de administradores activos, y debe
+  // detectar correctamente una carrera contra updateUser (cambio de rol) o
+  // contra otra llamada a setUserActive sobre un administrador distinto.
+  return runSerializableTransaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id } });
 
     if (!user) {
