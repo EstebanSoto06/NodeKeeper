@@ -1,6 +1,11 @@
 import { prisma } from "../../config/prisma.js";
 import { createHttpError } from "../../utils/http-error.js";
 import { runSerializableTransaction } from "../../utils/serializable-transaction.js";
+import {
+  deleteEvidenceFromQuarantine,
+  moveEvidenceToQuarantine,
+  restoreEvidenceFromQuarantine,
+} from "../../utils/evidence-file.js";
 
 const relatedUserSelect = {
   select: {
@@ -9,6 +14,22 @@ const relatedUserSelect = {
     email: true,
     role: true,
   },
+};
+
+// storedName/relativePath son detalles internos del filesystem y nunca deben
+// viajar al cliente: se restringe explicitamente con select en vez de
+// `evidences: true`, que traeria todas las columnas del modelo Evidence.
+const evidencesInclude = {
+  select: {
+    id: true,
+    maintenanceId: true,
+    originalName: true,
+    mimeType: true,
+    sizeBytes: true,
+    createdAt: true,
+    uploadedBy: relatedUserSelect,
+  },
+  orderBy: { createdAt: "asc" },
 };
 
 const maintenanceInclude = {
@@ -20,7 +41,7 @@ const maintenanceInclude = {
   checklistTasks: {
     orderBy: { sortOrder: "asc" },
   },
-  evidences: true,
+  evidences: evidencesInclude,
 };
 
 async function assertNetworkNodeExists(networkNodeId) {
@@ -107,10 +128,65 @@ export async function updateMaintenance(id, data) {
   });
 }
 
-export async function deleteMaintenance(id) {
-  await getMaintenanceById(id);
+async function restoreQuarantinedEvidences(storedNames) {
+  await Promise.all(
+    storedNames.map((storedName) => restoreEvidenceFromQuarantine(storedName)),
+  );
+}
 
-  await prisma.maintenance.delete({ where: { id } });
+export async function deleteMaintenance(id) {
+  const maintenance = await prisma.maintenance.findUnique({ where: { id } });
+
+  if (!maintenance) {
+    throw createHttpError(404, "Maintenance not found");
+  }
+
+  const evidences = await prisma.evidence.findMany({
+    where: { maintenanceId: id },
+    select: { id: true, storedName: true },
+  });
+
+  // PostgreSQL y el filesystem no comparten una transaccion atomica: los
+  // archivos se mueven a cuarentena ANTES de borrar en base de datos para
+  // poder restaurarlos si el delete falla, evitando dejar filas borradas
+  // con archivos huerfanos o archivos borrados con filas aun presentes.
+  const movedStoredNames = [];
+
+  for (const evidence of evidences) {
+    try {
+      await moveEvidenceToQuarantine(evidence.storedName);
+      movedStoredNames.push(evidence.storedName);
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        // El archivo fisico ya no existe: no hay nada que mover ni
+        // restaurar para esta evidencia en particular, se continua.
+        continue;
+      }
+
+      await restoreQuarantinedEvidences(movedStoredNames);
+      throw createHttpError(
+        500,
+        "Failed to prepare evidence files for deletion",
+      );
+    }
+  }
+
+  try {
+    await prisma.maintenance.delete({ where: { id } });
+  } catch (error) {
+    await restoreQuarantinedEvidences(movedStoredNames);
+    throw error;
+  }
+
+  await Promise.all(
+    movedStoredNames.map((storedName) =>
+      deleteEvidenceFromQuarantine(storedName).catch((cleanupError) => {
+        console.error(
+          `Evidence quarantine cleanup failed for maintenance ${id}: ${cleanupError.message}`,
+        );
+      }),
+    ),
+  );
 }
 
 export async function startMaintenance(id, userId) {
