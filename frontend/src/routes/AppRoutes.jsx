@@ -11,7 +11,7 @@
      AccessDenied (via ProtectedRoute roles).
    - /evidencias: no existe galeria global en el backend; muestra una pantalla
      informativa que enlaza a Mantenimientos (donde viven las evidencias). */
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell.jsx';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
 import { useLegacyGo, useLegacyRole } from './legacyNav.js';
@@ -36,18 +36,6 @@ function DashboardRoute() {
   const go = useLegacyGo();
   const role = useLegacyRole();
   return <Dashboard go={go} role={role} />;
-}
-
-function MaintenancesRoute() {
-  const go = useLegacyGo();
-  const role = useLegacyRole();
-  return <Maintenances go={go} role={role} />;
-}
-
-function MaintenanceDetailRoute() {
-  const { id } = useParams();
-  const go = useLegacyGo();
-  return <MaintenanceDetail id={id} go={go} />;
 }
 
 function CalendarRoute() {
@@ -85,8 +73,8 @@ export function AppRoutes() {
           <Route path="/equipos/:id" element={<EquipmentDetail />} />
           <Route path="/proveedores" element={<Providers />} />
           <Route path="/proveedores/:id" element={<ProviderDetail />} />
-          <Route path="/mantenimientos" element={<MaintenancesRoute />} />
-          <Route path="/mantenimientos/:id" element={<MaintenanceDetailRoute />} />
+          <Route path="/mantenimientos" element={<Maintenances />} />
+          <Route path="/mantenimientos/:id" element={<MaintenanceDetail />} />
           <Route path="/calendario" element={<CalendarRoute />} />
           <Route path="/mapa" element={<MapRoute />} />
           <Route path="/evidencias" element={<EvidencesInfo />} />

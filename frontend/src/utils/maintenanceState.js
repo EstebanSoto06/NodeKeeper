@@ -34,13 +34,23 @@ export function canComplete(status) {
   return status === MAINTENANCE_STATES.IN_PROGRESS;
 }
 
-/** Evidencias y checklist solo son editables mientras esta en progreso. */
+/** Evidencias (subir/eliminar) solo son editables mientras esta en progreso. */
 export function canManageEvidence(status) {
   return status === MAINTENANCE_STATES.IN_PROGRESS;
 }
 
+/** Marcar/desmarcar una tarea existente (PATCH de estado) solo mientras esta
+    en progreso (backend: checklist-task.service.js#setChecklistTaskStatus). */
 export function canManageChecklist(status) {
   return status === MAINTENANCE_STATES.IN_PROGRESS;
+}
+
+/** Crear/editar/eliminar tareas (estructura del checklist) solo mientras el
+    mantenimiento esta programado (backend: checklist-task.service.js
+    #createChecklistTask/#updateChecklistTask/#deleteChecklistTask exigen
+    SCHEDULED). No confundir con canManageChecklist, que rige el toggle. */
+export function canManageChecklistStructure(status) {
+  return status === MAINTENANCE_STATES.SCHEDULED;
 }
 
 /**
