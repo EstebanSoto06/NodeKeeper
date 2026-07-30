@@ -7,6 +7,7 @@ import app from "../../app.js";
 import { prisma } from "../../config/prisma.js";
 import { getEvidenceFilePath } from "../../utils/evidence-file.js";
 import { getMinimalJpegBuffer } from "../../tests/fixtures/file-fixtures.js";
+import { isForeignKeyConstraintError } from "../../utils/foreign-key-error.js";
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -312,19 +313,33 @@ describe("Preservacion de historial al eliminar equipos", () => {
 
   it("rejects a direct database deletion of equipment with maintenance history at the foreign key level", async () => {
     const equipmentId = await createEquipmentForHistoryTests();
-    await createCorrectiveMaintenance(equipmentId);
+    const maintenanceId = await createCorrectiveMaintenance(equipmentId);
 
     // Se prueba la restriccion en si misma, sin pasar por el service: la
     // comprobacion previa del service mejora el mensaje, pero la defensa
     // definitiva contra una carrera es esta foreign key ON DELETE RESTRICT.
-    await expect(
-      prisma.equipment.delete({ where: { id: equipmentId } }),
-    ).rejects.toMatchObject({ code: "P2003" });
+    // La asercion es semantica (isForeignKeyConstraintError), no un codigo
+    // literal: con @prisma/adapter-pg esta misma violacion puede llegar como
+    // P2003 o como un DriverAdapterError con SQLSTATE 23001/23503.
+    let deleteError;
+    try {
+      await prisma.equipment.delete({ where: { id: equipmentId } });
+    } catch (error) {
+      deleteError = error;
+    }
+
+    expect(deleteError).toBeDefined();
+    expect(isForeignKeyConstraintError(deleteError)).toBe(true);
 
     const stillExists = await prisma.equipment.findUnique({
       where: { id: equipmentId },
     });
     expect(stillExists).not.toBeNull();
+
+    const maintenanceStillExists = await prisma.maintenance.findUnique({
+      where: { id: maintenanceId },
+    });
+    expect(maintenanceStillExists).not.toBeNull();
   });
 
   it("never returns 500 when a maintenance is created concurrently with an equipment deletion", async () => {
