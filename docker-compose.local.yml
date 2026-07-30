@@ -1,0 +1,33 @@
+# PostgreSQL local opcional para desarrollo de NodeKeeper.
+# No incluye backend ni frontend: solo la base de datos. La ejecución sin
+# Docker (PostgreSQL instalado directamente) sigue igual de soportada y
+# documentada en docs/LOCAL_SETUP.md.
+#
+# Uso:
+#   docker compose -f docker-compose.local.yml up -d
+#
+# Los valores por defecto son ficticios y pensados solo para desarrollo local;
+# sobrescríbelos con variables de entorno si lo necesitas, por ejemplo:
+#   POSTGRES_PASSWORD=otra-clave POSTGRES_PORT=5433 docker compose -f docker-compose.local.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nodekeeper-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nodekeeper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-nodekeeper_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nodekeeper_postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nodekeeper} -d ${POSTGRES_DB:-nodekeeper_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  nodekeeper_postgres_local_data:

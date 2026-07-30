@@ -24,13 +24,21 @@ function renderPanel({ authValue, status, isCompleted = false }) {
 }
 
 describe('EvidencePanel', () => {
+  let anchorClickSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() });
+    // El componente crea un <a> con href blob: y llama a click() para disparar
+    // la descarga. jsdom no implementa esa navegación y emite una advertencia
+    // de consola no fatal; se espía click() para evitarla sin cambiar el
+    // comportamiento real de descarga (que sigue viviendo en el componente).
+    anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    anchorClickSpy.mockRestore();
   });
 
   it('carga y muestra el listado real de evidencias', async () => {
