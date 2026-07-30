@@ -1,114 +1,150 @@
-﻿# NodeKeeper
+# NodeKeeper
 
-NodeKeeper es una aplicacion web para la gestion centralizada del mantenimiento de nodos, equipos, proveedores de soporte, listas de chequeo, evidencias y reportes operativos.
+Aplicación web para la gestión centralizada del mantenimiento de nodos y equipos del Departamento de Mantenimiento de Coopelesca.
 
-El proyecto se desarrolla como una solucion academica tipo MVP para el Departamento de Mantenimiento de Coopelesca, utilizando una arquitectura cliente-servidor.
+## Problema que resuelve
 
-## Estado del proyecto
+El seguimiento de mantenimientos preventivos y correctivos de nodos, equipos y proveedores de soporte se hacía de forma manual y dispersa. NodeKeeper centraliza esa información: quién hizo qué mantenimiento, cuándo, con qué checklist y con qué evidencia, y quién puede hacer qué según su rol.
 
-Estado actual: configuracion inicial del repositorio y prototipo frontend aprobado.
+## Funcionalidades principales
 
-Objetivo de la semana: convertir el prototipo visual en una aplicacion funcional local con frontend, API, base de datos, autenticacion, roles, evidencias reales y pruebas.
+- Autenticación con JWT y control de acceso por rol, validado en el backend (no solo oculto en la interfaz).
+- Gestión de usuarios, nodos, equipos y proveedores de soporte.
+- Mantenimientos preventivos (asociados a un nodo) y correctivos (asociados a un equipo), con checklist obligatorio antes del cierre.
+- Carga de evidencias reales (JPG, PNG, PDF, DOCX) con validación del contenido real del archivo, no solo su extensión o tipo declarado.
+- Dashboard, calendario, mapa de nodos y reportes exportables a CSV, todos sobre datos reales de la API.
 
-## Stack tecnico
+## Roles
 
-Frontend:
+- **ADMIN**: gestiona usuarios, nodos, equipos, proveedores y mantenimientos; siempre debe existir al menos un ADMIN activo en el sistema (regla aplicada de forma atómica en el backend).
+- **OPERATOR**: consulta la información general y opera dentro del flujo de mantenimiento (iniciar, marcar checklist, adjuntar evidencias, crear correctivos), sin acceso a la administración de usuarios ni catálogos.
 
-- React
-- Vite
-- Tailwind CSS
-- Diseno liquid glass aprobado
+## Tecnologías
 
-Backend:
+| Capa | Tecnologías |
+|---|---|
+| Frontend | React 18, Vite, React Router, Tailwind CSS |
+| Backend | Node.js, Express, Prisma ORM, PostgreSQL, JWT, bcrypt, Multer, Zod |
+| Pruebas | Vitest + Supertest (backend), Vitest + React Testing Library (frontend) |
 
-- Node.js
-- Express
-- Prisma ORM
-- PostgreSQL
-- JWT
-- bcrypt
-- Multer
+## Arquitectura general
 
-Herramientas:
-
-- Visual Studio Code
-- Claude Code
-- Git y GitHub
-- Postman
-- PostgreSQL local
+Cliente-servidor clásico: el frontend (SPA) consume exclusivamente la API REST del backend; nunca se conecta directamente a PostgreSQL. Las reglas de negocio críticas (permisos por rol, regla de cierre del checklist, invariante del último ADMIN activo, validación real del tipo de archivo) viven en el backend. Detalle completo en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Estructura del repositorio
 
+```
 NodeKeeper/
-- frontend/
-- backend/
-- docs/
-- .claude/
-- .vscode/
-- CLAUDE.md
-- README.md
-- .gitignore
+├─ frontend/    # SPA React + Vite + Tailwind
+├─ backend/     # API Node.js + Express + Prisma
+├─ docs/        # Documentación técnica y de alcance
+├─ .github/     # Integración continua (GitHub Actions)
+├─ CLAUDE.md    # Guía de trabajo para Claude Code en este repositorio
+└─ README.md
+```
 
-## Modulos principales
+## Requisitos previos
 
-- Autenticacion y roles.
-- Usuarios.
-- Nodos.
-- Equipos.
-- Proveedores de soporte.
-- Mantenimientos preventivos y correctivos.
-- Listas de chequeo.
-- Evidencias reales.
-- Mapa operativo.
-- Calendario.
-- Reportes basicos.
+- Node.js 18 o superior
+- npm 9 o superior
+- PostgreSQL 14 o superior en ejecución (local o vía Docker, ver abajo)
 
-## Ejecucion local prevista
+## Instalación rápida
 
-Frontend:
+```bash
+git clone <url-del-repositorio>
+cd NodeKeeper
+npm run install:all
+```
 
-1. cd frontend
-2. npm.cmd ci
-3. npm.cmd run dev
+Guía paso a paso completa (PostgreSQL, migraciones, seed, arranque en dos terminales, errores comunes) en [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
 
-Backend:
+## Configuración
 
-1. cd backend
-2. npm.cmd install
-3. npm.cmd run dev
+Cada proyecto define sus propias variables de entorno a partir de un archivo `.env.example`:
 
-URLs locales previstas:
+- `backend/.env.example` → copiar a `backend/.env`
+- `frontend/.env.example` → copiar a `frontend/.env`
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:4000
+Ninguno de los dos contiene credenciales reales; todos los valores son ficticios y deben reemplazarse localmente.
 
-## Documentacion
+## Base de datos
 
-La documentacion base del proyecto se encuentra en la carpeta docs:
+PostgreSQL, gestionado con Prisma (esquema, migraciones y seed). Existe un `docker-compose.local.yml` opcional para levantar solo PostgreSQL en un contenedor si no se quiere instalar localmente; la ejecución sin Docker (PostgreSQL instalado directamente) sigue siendo la vía principal documentada. Detalle en [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
 
-- docs/PROJECT_CONTEXT.md
-- docs/requirements/MVP_SCOPE.md
-- docs/architecture/TECH_STACK.md
-- docs/testing/TESTING_STRATEGY.md
+## Ejecución backend
+
+```bash
+cd backend
+npm install
+npx prisma migrate dev
+npm run db:seed
+npm run dev
+```
+
+API disponible en `http://localhost:4000`.
+
+## Ejecución frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+SPA disponible en `http://localhost:5173`.
+
+## Pruebas
+
+```bash
+npm run test:backend    # Vitest + Supertest, 213 pruebas
+npm run test:frontend   # Vitest + React Testing Library, 115 pruebas
+```
+
+Estrategia, fixtures y comandos detallados en [docs/TESTING.md](docs/TESTING.md).
+
+## Cobertura
+
+```bash
+npm run test:coverage
+```
+
+Umbrales mínimos configurados en el frontend: 55% statements/functions/lines, 45% branches. Ver [docs/TESTING.md](docs/TESTING.md).
+
+## Build
+
+```bash
+cd frontend && npm run build
+```
+
+Genera `frontend/dist/`, listo para servirse como sitio estático detrás de un backend/proxy independiente.
 
 ## Seguridad
 
-Este repositorio no debe incluir:
+JWT + bcrypt, autorización por rol validada en cada endpoint, validación de entrada con Zod, verificación del tipo real de archivo (no solo extensión/MIME declarado) para evidencias, y protección atómica del último administrador activo. Detalle completo en [docs/SECURITY.md](docs/SECURITY.md).
 
-- Archivos .env.
-- Credenciales.
-- Tokens.
-- Archivos cargados como evidencia.
-- node_modules.
-- Builds generados.
-- Archivos ZIP temporales.
+## Limitaciones conocidas
 
-Las variables de entorno deben configurarse localmente a partir de archivos .env.example.
+- Sin despliegue público todavía: este bloque prepara CI y documentación, no publica el sistema en internet (ver [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+- El mapa de nodos es una proyección ilustrativa de coordenadas reales, no un mapa de terceros (Leaflet/Mapbox) integrado.
+- Fuera del alcance del MVP: notificaciones por correo/SMS, integraciones externas, tiempo real con WebSockets (ver [docs/requirements/MVP_SCOPE.md](docs/requirements/MVP_SCOPE.md)).
+
+## Documentación
+
+- [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) — contexto y objetivo del proyecto.
+- [docs/requirements/MVP_SCOPE.md](docs/requirements/MVP_SCOPE.md) — alcance del MVP.
+- [docs/architecture/TECH_STACK.md](docs/architecture/TECH_STACK.md) — stack técnico aprobado.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura, módulos y flujos.
+- [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md) — instalación local paso a paso.
+- [docs/API.md](docs/API.md) — referencia de endpoints por módulo.
+- [docs/TESTING.md](docs/TESTING.md) — estrategia y comandos de pruebas.
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — preparación de despliegue (conceptual, sin publicar aún).
+- [docs/SECURITY.md](docs/SECURITY.md) — modelo de seguridad.
+
+## Estado del proyecto
+
+MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa, reportes) y gestión de usuarios están implementados y probados (213 pruebas backend, 115 pruebas frontend). Este bloque agrega documentación, integración continua y preparación de reproducibilidad local; el despliegue público queda fuera de este alcance.
 
 ## Autor
 
 Esteban Soto
-
-## Nota
-
-Este proyecto se encuentra en desarrollo activo. La version actual corresponde a la base inicial del MVP.

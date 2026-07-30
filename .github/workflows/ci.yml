@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Valores ficticios solo para este workflow; nunca se usan secretos reales.
+env:
+  NODE_VERSION: "24"
+  DATABASE_URL: postgresql://nodekeeper_ci:nodekeeper_ci@localhost:5432/nodekeeper_ci?schema=public
+  JWT_SECRET: ci-only-not-a-real-secret-value-0123456789
+  SEED_ADMIN_PASSWORD: CiOnlyAdminPass123!
+  SEED_OPERATOR_PASSWORD: CiOnlyOperatorPass123!
+  FRONTEND_URL: http://localhost:5173
+
+jobs:
+  backend:
+    name: Backend (Prisma + Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nodekeeper_ci
+          POSTGRES_PASSWORD: nodekeeper_ci
+          POSTGRES_DB: nodekeeper_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nodekeeper_ci -d nodekeeper_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        working-directory: backend
+        run: npm run db:validate
+
+      - name: Apply migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Seed database (fixtures ficticias del workflow)
+        working-directory: backend
+        run: npm run db:seed
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+
+  frontend:
+    name: Frontend (Vitest + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests with coverage
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build

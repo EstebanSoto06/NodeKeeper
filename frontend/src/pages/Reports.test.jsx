@@ -31,17 +31,23 @@ async function renderReady(maintenances = [fixtureMaintenanceScheduled, mantenim
 describe('Reports', () => {
   let createObjectURLSpy;
   let printSpy;
+  let anchorClickSpy;
 
   beforeEach(() => {
     vi.clearAllMocks();
     createObjectURLSpy = vi.fn(() => 'blob:mock');
     vi.stubGlobal('URL', { ...URL, createObjectURL: createObjectURLSpy, revokeObjectURL: vi.fn() });
     printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+    // downloadCsv crea un <a> con href blob: y llama a click(); jsdom no
+    // implementa esa navegación y emite una advertencia no fatal. Se espía
+    // click() para evitarla sin cambiar el comportamiento real de descarga.
+    anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     printSpy.mockRestore();
+    anchorClickSpy.mockRestore();
   });
 
   it('muestra el contador de resultados filtrados sobre el total', async () => {
