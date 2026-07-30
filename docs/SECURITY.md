@@ -46,6 +46,10 @@ Las operaciones que dependen de un invariante compartido entre filas (ver más a
 
 Regla de negocio crítica: el sistema nunca debe quedar sin ningún usuario ADMIN activo. Se aplica de forma atómica (no solo con una comprobación previa separada de la escritura) al degradar el rol de un ADMIN o al desactivar un ADMIN: si la operación dejaría cero administradores activos, se rechaza con `409` — incluso bajo dos solicitudes concurrentes que individualmente parecerían válidas (ver los casos de concurrencia en [TESTING.md](TESTING.md#pruebas-concurrentes)).
 
+## Integridad referencial y preservación de evidencias
+
+Eliminar un `NetworkNode` o `Equipment` con historial de mantenimiento asociado se rechaza con `409`, tanto por una comprobación previa en el servicio (mensaje claro) como, de forma definitiva, por la propia restricción de clave foránea (`ON DELETE RESTRICT`) ante una carrera concurrente entre una eliminación y la creación de un mantenimiento. Esto evita que la eliminación de un catálogo destruya en cascada `Maintenance`/`ChecklistTask`/`Evidence` y deje archivos de evidencia huérfanos en disco sin ningún registro que los referencie. Un nodo o equipo sin historial de mantenimiento sigue pudiendo eliminarse normalmente.
+
 ## Secretos y entorno
 
 - Ningún secreto vive en el código fuente ni en los `.env.example` (solo placeholders explícitamente ficticios).

@@ -94,8 +94,36 @@ export async function updateEquipment(id, data) {
   }
 }
 
+const MAINTENANCE_HISTORY_ERROR =
+  "No se puede eliminar el equipo porque posee historial de mantenimiento.";
+
 export async function deleteEquipment(id) {
   await getEquipmentById(id);
 
-  await prisma.equipment.delete({ where: { id } });
+  // Comprobacion previa: mejora el mensaje para el caso comun, pero no es la
+  // defensa definitiva contra una carrera (ver catch de P2003 mas abajo, que
+  // es lo que realmente impide la eliminacion si un Maintenance se crea justo
+  // despues de este conteo).
+  const maintenanceCount = await prisma.maintenance.count({
+    where: { equipmentId: id },
+  });
+
+  if (maintenanceCount > 0) {
+    throw createHttpError(409, MAINTENANCE_HISTORY_ERROR);
+  }
+
+  try {
+    await prisma.equipment.delete({ where: { id } });
+  } catch (error) {
+    // P2003: violacion de llave foranea. Con Maintenance.equipmentId ahora en
+    // ON DELETE RESTRICT, esto ocurre si un Maintenance referencia este
+    // equipo (por ejemplo, creado justo despues del conteo anterior). Se
+    // traduce a 409 de negocio, nunca un 500, sin exponer el nombre interno
+    // de la restriccion.
+    if (error.code === "P2003") {
+      throw createHttpError(409, MAINTENANCE_HISTORY_ERROR);
+    }
+
+    throw error;
+  }
 }

@@ -66,7 +66,7 @@ Error:
 | GET | `/map` | ADMIN, OPERATOR | Nodos con coordenadas válidas, para el mapa |
 | POST | `/` | ADMIN | Crear (código único, nombre, ubicación, coordenadas, estado) |
 | PUT | `/:id` | ADMIN | Editar; código duplicado responde 409 |
-| DELETE | `/:id` | ADMIN | Eliminar |
+| DELETE | `/:id` | ADMIN | Eliminar; responde 409 si el nodo tiene mantenimientos directos o si alguno de sus equipos los tiene (historial preservado, ver ARCHITECTURE.md) |
 
 ## equipment — `/api/equipment`
 
@@ -75,7 +75,7 @@ Error:
 | GET | `/`, `/:id` | ADMIN, OPERATOR | Listar / detalle |
 | POST | `/` | ADMIN | Crear (nodo obligatorio, proveedor opcional, serie única) |
 | PUT | `/:id` | ADMIN | Editar; serie duplicada responde 409 |
-| DELETE | `/:id` | ADMIN | Eliminar |
+| DELETE | `/:id` | ADMIN | Eliminar; responde 409 si el equipo tiene historial de mantenimiento (historial preservado, ver ARCHITECTURE.md) |
 
 ## maintenances — `/api/maintenances`
 

@@ -139,8 +139,8 @@ export function NodeDetail() {
         title="Eliminar nodo"
         message={
           equip.length > 0
-            ? `¿Deseas eliminar el nodo "${node.name}" (${node.code})? Tiene ${equip.length} ${equip.length === 1 ? 'equipo asociado que también se eliminará' : 'equipos asociados que también se eliminarán'}. Esta acción no se puede deshacer.`
-            : `¿Deseas eliminar el nodo "${node.name}" (${node.code})? Esta acción no se puede deshacer.`
+            ? `¿Deseas eliminar el nodo "${node.name}" (${node.code})? Tiene ${equip.length} ${equip.length === 1 ? 'equipo asociado que también se eliminará si no tiene historial de mantenimiento propio' : 'equipos asociados que también se eliminarán si no tienen historial de mantenimiento propio'}. La eliminación se rechazará si el nodo, o alguno de sus equipos, tiene mantenimientos registrados. Esta acción no se puede deshacer.`
+            : `¿Deseas eliminar el nodo "${node.name}" (${node.code})? La eliminación se rechazará si el nodo tiene mantenimientos registrados. Esta acción no se puede deshacer.`
         }
         confirmLabel="Eliminar nodo"
         danger

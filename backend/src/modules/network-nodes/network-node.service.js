@@ -69,8 +69,36 @@ export async function updateNetworkNode(id, data) {
   }
 }
 
+const MAINTENANCE_HISTORY_ERROR =
+  "No se puede eliminar el nodo porque posee historial de mantenimiento directo o mediante sus equipos.";
+
 export async function deleteNetworkNode(id) {
   await getNetworkNodeById(id);
 
-  await prisma.networkNode.delete({ where: { id } });
+  // Comprobacion previa (mensaje claro para el caso comun): cuenta tanto los
+  // mantenimientos preventivos directos del nodo como los correctivos de
+  // cualquiera de sus equipos. La defensa definitiva contra una carrera es la
+  // foreign key ON DELETE RESTRICT (ver catch de P2003 mas abajo).
+  const [directMaintenanceCount, equipmentMaintenanceCount] = await Promise.all([
+    prisma.maintenance.count({ where: { networkNodeId: id } }),
+    prisma.maintenance.count({ where: { equipment: { networkNodeId: id } } }),
+  ]);
+
+  if (directMaintenanceCount > 0 || equipmentMaintenanceCount > 0) {
+    throw createHttpError(409, MAINTENANCE_HISTORY_ERROR);
+  }
+
+  try {
+    await prisma.networkNode.delete({ where: { id } });
+  } catch (error) {
+    // P2003 aqui solo puede provenir de la relacion Maintenance->NetworkNode
+    // (ON DELETE RESTRICT): un mantenimiento preventivo se creo justo despues
+    // del conteo anterior. La cascada Equipment->NetworkNode no cambia y no
+    // produce este codigo. Se traduce a 409, nunca un 500.
+    if (error.code === "P2003") {
+      throw createHttpError(409, MAINTENANCE_HISTORY_ERROR);
+    }
+
+    throw error;
+  }
 }

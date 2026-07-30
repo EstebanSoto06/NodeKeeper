@@ -114,8 +114,11 @@ model Maintenance {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  networkNode    NetworkNode?       @relation(fields: [networkNodeId], references: [id], onDelete: Cascade)
-  equipment      Equipment?         @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  // Restrict (no Cascade): el historial de mantenimiento debe preservarse.
+  // Un NetworkNode/Equipment con al menos un Maintenance asociado no puede
+  // eliminarse; ver network-node.service.js / equipment.service.js.
+  networkNode    NetworkNode?       @relation(fields: [networkNodeId], references: [id], onDelete: Restrict)
+  equipment      Equipment?         @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
   createdBy      User?              @relation("MaintenanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   startedBy      User?              @relation("MaintenanceStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
   closedBy       User?              @relation("MaintenanceClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
