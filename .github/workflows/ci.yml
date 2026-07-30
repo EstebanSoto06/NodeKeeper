@@ -8,7 +8,7 @@ on:
 
 # Valores ficticios solo para este workflow; nunca se usan secretos reales.
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
   DATABASE_URL: postgresql://nodekeeper_ci:nodekeeper_ci@localhost:5432/nodekeeper_ci?schema=public
   JWT_SECRET: ci-only-not-a-real-secret-value-0123456789
   SEED_ADMIN_PASSWORD: CiOnlyAdminPass123!
