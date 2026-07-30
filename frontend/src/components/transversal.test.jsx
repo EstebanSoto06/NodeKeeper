@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -62,6 +63,70 @@ describe('ConfirmDialog', () => {
 
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('en variant danger, el foco inicial va a Cancelar (no a Confirmar)', () => {
+    render(
+      <ConfirmDialog open danger title="Eliminar proveedor" confirmLabel="Eliminar" onConfirm={vi.fn()} onClose={vi.fn()} />,
+    );
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: 'Eliminar' }));
+  });
+
+  it('en variant danger, presionar Enter justo al abrir activa Cancelar, no Confirmar', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <ConfirmDialog open danger title="Eliminar proveedor" confirmLabel="Eliminar" onConfirm={onConfirm} onClose={onClose} />,
+    );
+
+    await user.keyboard('{Enter}');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('sin danger (no destructivo), conserva el foco inicial en Confirmar', () => {
+    render(<ConfirmDialog open title="Guardar cambios" confirmLabel="Guardar" onConfirm={vi.fn()} onClose={vi.fn()} />);
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Guardar' }));
+  });
+
+  it('al cerrarse, el foco vuelve al elemento que abrio el dialogo', async () => {
+    const user = userEvent.setup();
+
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <div>
+          <button type="button" onClick={() => setOpen(true)}>Abrir</button>
+          <ConfirmDialog
+            open={open}
+            danger
+            title="Eliminar"
+            confirmLabel="Eliminar"
+            onConfirm={vi.fn()}
+            onClose={() => setOpen(false)}
+          />
+        </div>
+      );
+    }
+
+    render(<Harness />);
+
+    const trigger = screen.getByText('Abrir');
+    trigger.focus();
+    await user.click(trigger);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(trigger);
   });
 });
 

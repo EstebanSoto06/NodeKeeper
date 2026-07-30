@@ -45,8 +45,8 @@ NodeKeeper/
 
 ## Requisitos previos
 
-- Node.js 18 o superior
-- npm 9 o superior
+- Node.js 24 (versión validada localmente y en CI; ver `engines` en cada `package.json`)
+- npm 10 o superior
 - PostgreSQL 14 o superior en ejecución (local o vía Docker, ver abajo)
 
 ## Instalación rápida
@@ -97,8 +97,8 @@ SPA disponible en `http://localhost:5173`.
 ## Pruebas
 
 ```bash
-npm run test:backend    # Vitest + Supertest, 213 pruebas
-npm run test:frontend   # Vitest + React Testing Library, 115 pruebas
+npm run test:backend    # Vitest + Supertest, 230 pruebas
+npm run test:frontend   # Vitest + React Testing Library, 123 pruebas
 ```
 
 Estrategia, fixtures y comandos detallados en [docs/TESTING.md](docs/TESTING.md).
@@ -143,7 +143,7 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 
 ## Estado del proyecto
 
-MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa, reportes) y gestión de usuarios están implementados y probados (213 pruebas backend, 115 pruebas frontend). Este bloque agrega documentación, integración continua y preparación de reproducibilidad local; el despliegue público queda fuera de este alcance.
+MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa, reportes) y gestión de usuarios están implementados y probados (230 pruebas backend, 123 pruebas frontend). El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El despliegue público queda fuera de este alcance.
 
 ## Autor
 
