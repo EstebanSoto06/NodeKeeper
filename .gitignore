@@ -37,6 +37,10 @@ backend/uploads/evidences/*
 backend/prisma/dev.db
 backend/prisma/dev.db-journal
 
+# Backups locales de PostgreSQL (nunca deben subirse: contienen datos reales)
+*.dump
+ops/backup-restore/backups/
+
 # OS files
 .DS_Store
 Thumbs.db

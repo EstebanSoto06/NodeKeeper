@@ -140,6 +140,7 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 - [docs/TESTING.md](docs/TESTING.md) — estrategia y comandos de pruebas.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — preparación de despliegue (conceptual, sin publicar aún).
 - [docs/SECURITY.md](docs/SECURITY.md) — modelo de seguridad.
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) — procedimientos operativos: arranque, backup/restore, health/readiness, diagnóstico y recuperación.
 
 ## Estado del proyecto
 
