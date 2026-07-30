@@ -6,9 +6,10 @@
 # Uso:
 #   docker compose -f docker-compose.local.yml up -d
 #
-# Los valores por defecto son ficticios y pensados solo para desarrollo local;
-# sobrescríbelos con variables de entorno si lo necesitas, por ejemplo:
-#   POSTGRES_PASSWORD=otra-clave POSTGRES_PORT=5433 docker compose -f docker-compose.local.yml up -d
+# El valor por defecto de POSTGRES_PASSWORD es un placeholder, no una
+# credencial real: reemplázalo con tu propio valor via variable de entorno,
+# por ejemplo:
+#   POSTGRES_PASSWORD=tu-clave-local POSTGRES_PORT=5433 docker compose -f docker-compose.local.yml up -d
 
 services:
   postgres:
@@ -17,7 +18,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nodekeeper}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_password_here}
       POSTGRES_DB: ${POSTGRES_DB:-nodekeeper_dev}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"

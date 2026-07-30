@@ -51,6 +51,10 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
       - name: Validate Prisma schema
         working-directory: backend
         run: npm run db:validate
