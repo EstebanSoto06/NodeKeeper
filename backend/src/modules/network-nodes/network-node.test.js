@@ -7,6 +7,7 @@ import app from "../../app.js";
 import { prisma } from "../../config/prisma.js";
 import { getEvidenceFilePath } from "../../utils/evidence-file.js";
 import { getMinimalJpegBuffer } from "../../tests/fixtures/file-fixtures.js";
+import { isForeignKeyConstraintError } from "../../utils/foreign-key-error.js";
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -301,14 +302,26 @@ describe("Preservacion de historial al eliminar nodos", () => {
 
   it("rejects a direct database deletion of a node with maintenance history at the foreign key level", async () => {
     const { id: networkNodeId, adminToken } = await createNodeForHistoryTests();
-    await createPreventiveMaintenance(networkNodeId, adminToken);
+    const maintenanceId = await createPreventiveMaintenance(networkNodeId, adminToken);
 
-    await expect(
-      prisma.networkNode.delete({ where: { id: networkNodeId } }),
-    ).rejects.toMatchObject({ code: "P2003" });
+    // Asercion semantica (isForeignKeyConstraintError), no un codigo literal:
+    // con @prisma/adapter-pg esta misma violacion puede llegar como P2003 o
+    // como un DriverAdapterError con SQLSTATE 23001/23503.
+    let deleteError;
+    try {
+      await prisma.networkNode.delete({ where: { id: networkNodeId } });
+    } catch (error) {
+      deleteError = error;
+    }
+
+    expect(deleteError).toBeDefined();
+    expect(isForeignKeyConstraintError(deleteError)).toBe(true);
 
     expect(
       await prisma.networkNode.findUnique({ where: { id: networkNodeId } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.maintenance.findUnique({ where: { id: maintenanceId } }),
     ).not.toBeNull();
   });
 

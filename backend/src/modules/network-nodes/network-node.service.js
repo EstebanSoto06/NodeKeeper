@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { createHttpError } from "../../utils/http-error.js";
+import { isForeignKeyConstraintError } from "../../utils/foreign-key-error.js";
 
 const mapSelect = {
   id: true,
@@ -91,11 +92,13 @@ export async function deleteNetworkNode(id) {
   try {
     await prisma.networkNode.delete({ where: { id } });
   } catch (error) {
-    // P2003 aqui solo puede provenir de la relacion Maintenance->NetworkNode
-    // (ON DELETE RESTRICT): un mantenimiento preventivo se creo justo despues
+    // Violacion de llave foranea (P2003, o su equivalente SQLSTATE
+    // 23001/23503 con @prisma/adapter-pg, ver isForeignKeyConstraintError)
+    // aqui solo puede provenir de la relacion Maintenance->NetworkNode (ON
+    // DELETE RESTRICT): un mantenimiento preventivo se creo justo despues
     // del conteo anterior. La cascada Equipment->NetworkNode no cambia y no
-    // produce este codigo. Se traduce a 409, nunca un 500.
-    if (error.code === "P2003") {
+    // produce este error. Se traduce a 409, nunca un 500.
+    if (isForeignKeyConstraintError(error)) {
       throw createHttpError(409, MAINTENANCE_HISTORY_ERROR);
     }
 

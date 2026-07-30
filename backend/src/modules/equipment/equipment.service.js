@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { createHttpError } from "../../utils/http-error.js";
+import { isForeignKeyConstraintError } from "../../utils/foreign-key-error.js";
 
 const equipmentInclude = {
   networkNode: true,
@@ -115,12 +116,13 @@ export async function deleteEquipment(id) {
   try {
     await prisma.equipment.delete({ where: { id } });
   } catch (error) {
-    // P2003: violacion de llave foranea. Con Maintenance.equipmentId ahora en
-    // ON DELETE RESTRICT, esto ocurre si un Maintenance referencia este
-    // equipo (por ejemplo, creado justo despues del conteo anterior). Se
-    // traduce a 409 de negocio, nunca un 500, sin exponer el nombre interno
-    // de la restriccion.
-    if (error.code === "P2003") {
+    // Violacion de llave foranea (P2003, o su equivalente SQLSTATE
+    // 23001/23503 con @prisma/adapter-pg, ver isForeignKeyConstraintError).
+    // Con Maintenance.equipmentId ahora en ON DELETE RESTRICT, esto ocurre
+    // si un Maintenance referencia este equipo (por ejemplo, creado justo
+    // despues del conteo anterior). Se traduce a 409 de negocio, nunca un
+    // 500, sin exponer el nombre interno de la restriccion.
+    if (isForeignKeyConstraintError(error)) {
       throw createHttpError(409, MAINTENANCE_HISTORY_ERROR);
     }
 
