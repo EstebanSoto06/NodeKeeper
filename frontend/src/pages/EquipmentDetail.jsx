@@ -145,7 +145,7 @@ export function EquipmentDetail() {
       <ConfirmDialog
         open={confirmingDelete}
         title="Eliminar equipo"
-        message={`¿Deseas eliminar "${equipment.name}"? Esta acción no se puede deshacer.`}
+        message={`¿Deseas eliminar "${equipment.name}"? La eliminación se rechazará si el equipo tiene historial de mantenimiento. Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar equipo"
         danger
         busy={deleting}

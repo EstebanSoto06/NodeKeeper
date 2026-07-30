@@ -33,6 +33,7 @@ PostgreSQL. Entidades principales: `User`, `SupportProvider`, `NetworkNode`, `Eq
 - `Equipment.networkNodeId` obligatorio (un equipo pertenece a un nodo).
 - `Equipment.supportProviderId` opcional (`ON DELETE SET NULL`): al eliminar un proveedor, sus equipos quedan como "No asignado", nunca se eliminan.
 - `Maintenance` es preventivo (ligado a `NetworkNode`) o correctivo (ligado a `Equipment`), con `ChecklistTask[]` y `Evidence[]` propias.
+- `Maintenance.networkNodeId`/`Maintenance.equipmentId` usan `ON DELETE RESTRICT`: el historial de mantenimiento está protegido a nivel de base de datos. Un `NetworkNode` o `Equipment` con al menos un `Maintenance` asociado no puede eliminarse (la eliminación falla con un 409, tanto si la rechaza la comprobación previa del servicio como si la rechaza directamente la restricción de clave foránea ante una carrera concurrente). Un nodo sin historial sigue pudiendo eliminarse junto con sus equipos sin historial, vía el `ON DELETE CASCADE` de `Equipment.networkNodeId` (sin cambios).
 
 ## Autenticación
 

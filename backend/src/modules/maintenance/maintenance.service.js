@@ -104,16 +104,36 @@ export async function getMaintenanceById(id) {
   return maintenance;
 }
 
+// prepareMaintenanceData ya confirmo que el nodo/equipo existia en el momento
+// de la lectura, pero entre esa lectura y este write alguien mas pudo
+// eliminarlo (p. ej. una eliminacion de Equipment que ya no tenia
+// mantenimientos en ese instante). La foreign key rechaza el INSERT/UPDATE
+// con P2003 en ese caso; se traduce a 404 en vez de dejarlo escapar como 500.
+function rethrowAsNotFoundOnForeignKeyViolation(error) {
+  if (error.code === "P2003") {
+    throw createHttpError(
+      404,
+      "The referenced network node or equipment no longer exists",
+    );
+  }
+
+  throw error;
+}
+
 export async function createMaintenance(data, userId) {
   const preparedData = await prepareMaintenanceData(data);
 
-  return prisma.maintenance.create({
-    data: {
-      ...preparedData,
-      createdById: userId,
-    },
-    include: maintenanceInclude,
-  });
+  try {
+    return await prisma.maintenance.create({
+      data: {
+        ...preparedData,
+        createdById: userId,
+      },
+      include: maintenanceInclude,
+    });
+  } catch (error) {
+    return rethrowAsNotFoundOnForeignKeyViolation(error);
+  }
 }
 
 export async function updateMaintenance(id, data) {
@@ -121,11 +141,15 @@ export async function updateMaintenance(id, data) {
 
   const preparedData = await prepareMaintenanceData(data);
 
-  return prisma.maintenance.update({
-    where: { id },
-    data: preparedData,
-    include: maintenanceInclude,
-  });
+  try {
+    return await prisma.maintenance.update({
+      where: { id },
+      data: preparedData,
+      include: maintenanceInclude,
+    });
+  } catch (error) {
+    return rethrowAsNotFoundOnForeignKeyViolation(error);
+  }
 }
 
 async function restoreQuarantinedEvidences(storedNames) {
