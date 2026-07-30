@@ -22,6 +22,16 @@ export function errorHandler(error, req, res, next) {
 
   const statusCode = error.statusCode || 500;
 
+  // Solo se registran errores inesperados (5xx) en el log del servidor, con
+  // el request id para correlacionar; los 4xx de negocio (validacion,
+  // permisos, conflicto) no ensucian el log. Nunca se registra el body de la
+  // solicitud, el header Authorization ni ninguna contraseña.
+  if (statusCode >= 500) {
+    console.error(
+      `[${req.id || "-"}] ${req.method} ${req.originalUrl} -> ${statusCode}: ${error.message}`,
+    );
+  }
+
   return res.status(statusCode).json({
     success: false,
     message: error.message || "Internal server error",

@@ -58,7 +58,7 @@ No implementados dentro del repositorio. En producción corresponden a la herram
 
 ## Health checks
 
-`GET /api/health` (backend) y `GET /` (raíz de la API) responden sin autenticación, aptos como *health check* de un orquestador o balanceador.
+`GET /api/health` (liveness, siempre `200` si el proceso responde), `GET /api/ready` (readiness, `200`/`503` según si PostgreSQL responde) y `GET /` (raíz de la API) responden sin autenticación, aptos como *health/readiness check* de un orquestador o balanceador. Ninguno expone host, usuario, contraseña ni la cadena de conexión. Ver [RUNBOOK.md](RUNBOOK.md#health) y [RUNBOOK.md](RUNBOOK.md#readiness).
 
 ## Rollback (conceptual)
 

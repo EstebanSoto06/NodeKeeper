@@ -1,0 +1,101 @@
+# Ejemplo de configuración de Nginx para NodeKeeper (fuera de la configuración
+# activa del proyecto — nada de esto se ejecuta en desarrollo local). Sirve
+# como punto de partida documentado, no como configuración lista para copiar
+# y pegar en producción sin ajustes.
+#
+# - Reemplaza <TU_DOMINIO>, las rutas de certificado y las rutas absolutas
+#   por los valores reales de tu entorno; ninguno aparece aquí.
+# - No incluye certificados ni claves privadas.
+# - Asume el backend de NodeKeeper escuchando en 127.0.0.1:4000 (PORT del
+#   backend) y el build estático del frontend (frontend/dist) servido por
+#   este mismo Nginx.
+
+# --- Redirección HTTP -> HTTPS ---
+server {
+    listen 80;
+    listen [::]:80;
+    server_name <TU_DOMINIO>;
+
+    # Util para validación ACME (Let's Encrypt) si se usa ese flujo.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# --- Servidor HTTPS ---
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name <TU_DOMINIO>;
+
+    # Terminación TLS: rutas de ejemplo, ajusta a tu proveedor de
+    # certificados (Let's Encrypt, un balanceador gestionado, etc.).
+    ssl_certificate     /etc/nginx/ssl/<TU_DOMINIO>/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/<TU_DOMINIO>/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    # Cabeceras de seguridad adicionales a las que ya envía helmet() en el
+    # backend (estas aplican también a los assets estáticos servidos aquí).
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Límite de tamaño de cuerpo de solicitud. El backend ya limita el JSON a
+    # 10mb y las evidencias por MAX_FILE_SIZE_MB; este límite del proxy debe
+    # ser al menos igual de generoso para no bloquear cargas válidas antes de
+    # que lleguen al backend.
+    client_max_body_size 15m;
+
+    # Frontend estático (build de `npm run build`, carpeta frontend/dist).
+    root /var/www/nodekeeper/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy hacia el backend de NodeKeeper.
+    location /api/ {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+
+        # Cabeceras estándar para que el backend vea el origen real del
+        # cliente. IMPORTANTE: estas cabeceras solo son confiables si el
+        # backend tiene "trust proxy" configurado explícitamente para ESTE
+        # proxy (ver backend/src/app.js y docs/SECURITY.md#rate-limiting);
+        # sin esa configuración explícita, el rate limiting seguiría viendo
+        # la IP de este proxy para todas las solicitudes, no la del cliente.
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Timeouts razonables para solicitudes normales de la API. Las
+        # cargas de evidencias pueden tardar más según el tamaño del
+        # archivo y la red del cliente; ajusta si es necesario.
+        proxy_connect_timeout 5s;
+        proxy_send_timeout    30s;
+        proxy_read_timeout    30s;
+
+        # No cachear respuestas de la API en el proxy.
+        proxy_buffering off;
+    }
+
+    # Los archivos de evidencia NUNCA se sirven como estáticos desde este
+    # proxy: solo existen a través de la ruta autenticada del backend
+    # (GET /api/maintenances/:id/evidences/:evidenceId/file), ya cubierta
+    # por el bloque `location /api/` de arriba. No agregues un `location`
+    # que apunte directamente a la carpeta de uploads del backend.
+
+    # Rate limiting multiinstancia: si se despliega más de una instancia del
+    # backend detrás de este mismo Nginx, el rate limiting en memoria de
+    # cada instancia (ver docs/SECURITY.md#rate-limiting) deja de ser
+    # consistente entre instancias — un cliente podría agotar el cupo de una
+    # instancia y seguir teniendo cupo en otra. Nginx también puede aplicar
+    # su propio `limit_req_zone` como capa adicional independiente del
+    # backend, o el backend puede migrar a un store compartido (Redis).
+}
