@@ -38,6 +38,8 @@ Las mismas que en desarrollo (ver `backend/.env.example`, `frontend/.env.example
 
 En producción, lo habitual es un proxy inverso (Nginx u otro) delante del backend, terminando TLS y enrutando `/api` hacia el proceso Node. `FRONTEND_URL` (usado por `cors()` en `app.js`) debe coincidir exactamente con el origen público real del frontend.
 
+Si se despliega detrás de un proxy conocido, `app.set("trust proxy", ...)` debe configurarse explícitamente con el valor específico de ese proxy (nunca `true` a ciegas) para que el rate limiting (ver [SECURITY.md](SECURITY.md#rate-limiting)) identifique la IP real del cliente en vez de la del propio proxy. Si además se despliega más de una instancia del backend, el rate limiting necesitaría un store compartido (hoy usa memoria del propio proceso).
+
 ## HTTPS
 
 No se implementa dentro de la aplicación Node (Express no termina TLS aquí): debe terminarse en el proxy/balanceador. `helmet()` ya está activo para las cabeceras de seguridad HTTP habituales.

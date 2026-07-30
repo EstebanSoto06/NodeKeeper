@@ -4,7 +4,7 @@ Ver también: [../README.md](../README.md) (resumen rápido), [ARCHITECTURE.md](
 
 ## Requisitos
 
-- Node.js 18 o superior, npm 9 o superior.
+- Node.js 24 (versión validada localmente y en CI), npm 10 o superior.
 - PostgreSQL 14+ en ejecución, local o vía el `docker-compose.local.yml` opcional del repositorio (ver más abajo). Esto **no** contradice la decisión de "sin Docker" del [alcance del MVP](requirements/MVP_SCOPE.md): ese archivo solo levanta PostgreSQL como herramienta de desarrollo, no empaqueta ni despliega la aplicación; instalar PostgreSQL directamente en el sistema sigue siendo igual de válido y es lo que se documenta como vía principal.
 
 ## PostgreSQL

@@ -5,6 +5,7 @@ import morgan from "morgan";
 
 import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
+import { apiRateLimiter } from "./middlewares/rate-limit.middleware.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import supportProviderRoutes from "./modules/support-providers/support-provider.routes.js";
 import networkNodeRoutes from "./modules/network-nodes/network-node.routes.js";
@@ -40,7 +41,17 @@ app.get("/", (req, res) => {
   });
 });
 
+// Los health checks se registran ANTES del limitador general (y responden
+// directamente sin llamar a next()), por lo que nunca lo atraviesan.
 app.use("/api/health", healthRoutes);
+
+// "trust proxy" NO se activa aqui: sin un proxy inverso conocido delante,
+// confiar en X-Forwarded-For dejaria que cualquier cliente falsifique su IP
+// y evada el limite. Si en produccion se despliega detras de un proxy
+// propio, activar `app.set("trust proxy", ...)` con el valor especifico de
+// ese proxy (ver docs/DEPLOYMENT.md), nunca `true` a ciegas.
+app.use("/api", apiRateLimiter);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/support-providers", supportProviderRoutes);
 app.use("/api/network-nodes", networkNodeRoutes);

@@ -5,7 +5,9 @@
 
    Accesibilidad:
    - Escape cierra (heredado de Modal).
-   - El boton de confirmacion recibe el foco al abrir.
+   - Foco inicial: en acciones `danger` va a "Cancelar"; en el resto, a
+     "Confirmar" (comportamiento previo).
+   - Al cerrarse, el foco vuelve a quien abrio el dialogo si sigue en el DOM.
    - Ambos botones declaran type="button".
    - Mientras `busy` esta activo, los botones se deshabilitan para evitar
      doble envio, y el texto de confirmar refleja el estado de carga.
@@ -23,7 +25,6 @@
      /> */
 import { useEffect, useRef } from 'react';
 import { Modal } from './Modal.jsx';
-import { Button } from './Button.jsx';
 
 export function ConfirmDialog({
   open,
@@ -39,12 +40,26 @@ export function ConfirmDialog({
   children,
 }) {
   const confirmRef = useRef(null);
+  const cancelRef = useRef(null);
+  const triggerRef = useRef(null);
 
   useEffect(() => {
-    if (open && confirmRef.current) {
-      confirmRef.current.focus();
-    }
-  }, [open]);
+    if (!open) return undefined;
+
+    // Foco inicial: en acciones destructivas va a "Cancelar" para que un
+    // Enter accidental justo al abrir no dispare la accion; en el resto de
+    // casos se conserva el foco en "Confirmar" (comportamiento previo).
+    triggerRef.current = document.activeElement;
+    const initialFocusTarget = danger ? cancelRef.current : confirmRef.current;
+    initialFocusTarget?.focus();
+
+    return () => {
+      // Restaura el foco a quien abrio el dialogo, si sigue en el DOM.
+      if (triggerRef.current && document.contains(triggerRef.current)) {
+        triggerRef.current.focus();
+      }
+    };
+  }, [open, danger]);
 
   if (!open) return null;
 
@@ -56,9 +71,15 @@ export function ConfirmDialog({
       onClose={busy ? undefined : onClose}
       footer={
         <>
-          <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
-            {cancelLabel}
-          </Button>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="nk-btn nk-btn-ghost nk-btn-md"
+            onClick={onClose}
+            disabled={busy}
+          >
+            <span>{cancelLabel}</span>
+          </button>
           <button
             ref={confirmRef}
             type="button"

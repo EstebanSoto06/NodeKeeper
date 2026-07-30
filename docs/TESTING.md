@@ -8,12 +8,12 @@ Este documento describe la suite de pruebas realmente implementada, no la planif
 
 - Ubicación: `backend/src/**/*.test.js` (una por módulo, más utilidades en `backend/src/utils/*.test.js` y pruebas de infraestructura en `backend/src/tests/`).
 - Corren contra una base de datos PostgreSQL real (la de `DATABASE_URL`), con Prisma; algunas (`database-seed.test.js`) verifican explícitamente el resultado del seed, por lo que **requieren que `prisma migrate dev` y `npm run db:seed` ya se hayan ejecutado** sobre esa base antes de correr `npm test`.
-- Cobertura funcional: autenticación, autorización por rol en cada endpoint, CRUD de catálogos con sus reglas (código/serie duplicados, proveedor opcional, cascada a "No asignado"), flujo completo de mantenimiento (crear, iniciar, checklist, bloqueo/permiso de cierre), evidencias (subida, tipo real de archivo, descarga, cuarentena, eliminación) y usuarios (incluida la invariante del último ADMIN activo).
+- Cobertura funcional: autenticación, autorización por rol en cada endpoint, CRUD de catálogos con sus reglas (código/serie duplicados, proveedor opcional, cascada a "No asignado"), preservación del historial de mantenimiento al eliminar nodos/equipos (`ON DELETE RESTRICT`, ver [ARCHITECTURE.md](ARCHITECTURE.md)), flujo completo de mantenimiento (crear, iniciar, checklist, bloqueo/permiso de cierre), evidencias (subida, tipo real de archivo, descarga, cuarentena, eliminación), usuarios (incluida la invariante del último ADMIN activo) y rate limiting (`backend/src/middlewares/rate-limit.middleware.test.js`: límite general, límite estricto de login, `skipSuccessfulRequests`, exclusión de `/api/health`, aislamiento entre instancias).
 
 ```bash
 cd backend
 npm run db:validate   # valida el esquema de Prisma
-npm test              # 213 pruebas
+npm test              # 230 pruebas
 ```
 
 ## Frontend — Vitest + React Testing Library
@@ -21,11 +21,11 @@ npm test              # 213 pruebas
 - Ubicación: `frontend/src/**/*.test.jsx` / `*.test.js`, junto al archivo que prueban.
 - Entorno `jsdom`; utilidades compartidas en `frontend/src/test/` (`setupTests.js`, `fixtures.js`, `test-utils.jsx`).
 - `renderWithProviders` envuelve cada prueba en `MemoryRouter` + un `AuthContext` controlado (sesión ADMIN, OPERATOR o invitado), sin red real: los servicios se mockean por módulo (`vi.mock('../services/xService.js', ...)`).
-- Cobertura funcional: cliente HTTP y sesión (`apiClient`, `AuthContext`, `ProtectedRoute`), hooks y componentes transversales, catálogos, mantenimientos/checklist/evidencias, usuarios, y vistas operativas (dashboard, calendario, mapa, reportes).
+- Cobertura funcional: cliente HTTP y sesión (`apiClient`, `AuthContext`, `ProtectedRoute`), hooks y componentes transversales (incluida la gestión de foco de `ConfirmDialog`: foco inicial en "Cancelar" para acciones destructivas, restauración de foco al cerrar), catálogos (incluidos los mensajes de bloqueo por historial de mantenimiento en Nodos/Equipos), mantenimientos/checklist/evidencias, usuarios, y vistas operativas (dashboard, calendario, mapa, reportes).
 
 ```bash
 cd frontend
-npm test               # 115 pruebas
+npm test               # 123 pruebas
 npm run test:coverage  # pruebas + reporte de cobertura
 ```
 
@@ -49,7 +49,7 @@ Umbrales mínimos configurados en `frontend/vite.config.js` (`test.coverage.thre
 | Lines | 55% |
 | Branches | 45% |
 
-El backend no impone un umbral de cobertura configurado; su cobertura funcional se sostiene con 213 pruebas de integración contra una base de datos real.
+El backend no impone un umbral de cobertura configurado; su cobertura funcional se sostiene con 230 pruebas de integración contra una base de datos real.
 
 ## Fixtures
 
