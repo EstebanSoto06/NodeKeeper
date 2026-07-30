@@ -21,7 +21,11 @@ import {
 import { clearToken, getToken, setToken, UNAUTHORIZED_EVENT } from '../services/apiClient.js';
 import { getCurrentUser, login as loginRequest } from '../services/authService.js';
 
-const AuthContext = createContext(null);
+// Exportado (ademas de AuthProvider/useAuth) unicamente para que
+// src/test/test-utils.jsx pueda inyectar un valor de sesion controlado en
+// las pruebas via <AuthContext.Provider value={...}>, sin mockear el
+// modulo. No cambia el comportamiento en tiempo de ejecucion de la app.
+export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
