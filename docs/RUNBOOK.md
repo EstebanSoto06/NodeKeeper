@@ -47,6 +47,10 @@ DATABASE_URL="postgresql://usuario:clave@host:puerto/base" ./backup.sh
 
 Genera un archivo `.dump` (formato `custom` de `pg_dump`) en `ops/backup-restore/backups/` (ignorado por git — nunca se sube al repositorio). Ver [backup.sh](../ops/backup-restore/backup.sh).
 
+**Validado en vivo** (F4 ya resuelto): backup real de `nodekeeper_dev` con PostgreSQL 18.4 (herramientas nativas en `C:\Program Files\PostgreSQL\18\bin`, no están en el `PATH` por defecto en Windows — usar rutas absolutas o agregarlas temporalmente a la sesión, nunca de forma permanente solo para esto). El archivo resultante se verificó con `pg_restore --list` (48 entradas de esquema/tabla, formato `CUSTOM` correcto) y con su hash SHA-256 (calculado únicamente para comprobar integridad — no es un secreto, pero no se publica aquí porque cambia en cada backup nuevo).
+
+> `DATABASE_URL` incluye `?schema=public` (parámetro propio de Prisma). Las herramientas nativas de PostgreSQL no lo reconocen como parte de una URI válida: hay que quitar la query string antes de pasarla a `pg_dump`/`pg_restore`/`psql` (el esquema por defecto de PostgreSQL ya es `public`, así que omitirlo no cambia nada).
+
 ## Restore
 
 ```bash
@@ -56,7 +60,16 @@ DATABASE_URL="postgresql://usuario:clave@host:puerto/base_de_restauracion" ./res
 
 **Siempre contra una base de restauración separada**, nunca directamente sobre la base activa — permite validar el backup (conteos de filas, integridad) antes de promoverlo. Ver [restore.sh](../ops/backup-restore/restore.sh).
 
-> Nota de esta sesión: el procedimiento de backup/restore quedó diseñado y con la sintaxis de los scripts validada (`bash -n`), pero **no pudo ejecutarse de punta a punta** por el mismo bloqueo de PostgreSQL local documentado más abajo (sin conexión de base de datos funcional disponible, y sin Docker en este entorno). Verificar en la primera oportunidad con una base real.
+**Bloqueado en esta sesión** al intentar crear la base separada `nodekeeper_restore_validation`: el rol `nodekeeper` no tiene el atributo `CREATEDB` ni es superusuario (verificado con `SELECT rolname, rolcreatedb, rolsuper FROM pg_roles WHERE rolname = current_user;` → `nodekeeper | f | f`). El backup en sí quedó validado (ver arriba); lo que no pudo probarse de punta a punta es la restauración, exclusivamente por este permiso. Para desbloquearlo, con un superusuario local (p. ej. `postgres`):
+
+```sql
+ALTER ROLE nodekeeper WITH CREATEDB;
+-- o, si prefieres no otorgar el permiso de forma permanente, que el
+-- superusuario cree la base de restauración una sola vez:
+CREATE DATABASE nodekeeper_restore_validation OWNER nodekeeper ENCODING 'UTF8';
+```
+
+Con cualquiera de las dos, `restore.sh` (o los mismos pasos manuales de esta sesión) debería poder ejecutarse de punta a punta.
 
 ## Health
 

@@ -50,7 +50,7 @@ No se implementa dentro de la aplicación Node (Express no termina TLS aquí): d
 
 ## Backups
 
-No implementados dentro del repositorio. En producción corresponden a la herramienta de backup propia del proveedor de PostgreSQL (snapshots gestionados o `pg_dump` programado) más, si aplica, backup del volumen de `backend/uploads/evidences`.
+Procedimiento manual con `pg_dump`/`pg_restore` disponible y validado en local (backup real ejecutado y verificado con `pg_restore --list` y SHA-256; restauración en base separada diseñada pero bloqueada en esta sesión por permisos del rol, ver [RUNBOOK.md](RUNBOOK.md#restore)). En producción, esto se complementaría con la herramienta de backup propia del proveedor de PostgreSQL (snapshots gestionados o `pg_dump` programado) más, si aplica, backup del volumen de `backend/uploads/evidences`; no implementado como automatización en este repositorio.
 
 ## Logs
 
