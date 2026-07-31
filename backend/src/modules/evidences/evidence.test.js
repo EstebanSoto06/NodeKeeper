@@ -1034,10 +1034,37 @@ describe("Evidence routes", () => {
       }
     });
 
-    it("deleting concurrently with complete never deletes an evidence after COMPLETED", async () => {
+    // completeMaintenance y deleteEvidence comparten la misma dependencia de
+    // escritura sobre Maintenance (ambos hacen un UPDATE condicionado por
+    // status="IN_PROGRESS", ver los comentarios en maintenance.service.js y
+    // evidence.service.js), por lo que Postgres Serializable linealiza esta
+    // carrera en exactamente uno de dos ordenes validos — nunca deja un
+    // resultado no serializable:
+    //
+    //   Orden A (delete se linealiza antes que complete): el delete ve
+    //   IN_PROGRESS, borra la evidencia; complete corre despues, ve
+    //   IN_PROGRESS todavia (el delete no cambio el status) y completa sin
+    //   problema. Resultado: delete=200, complete=200, Maintenance
+    //   COMPLETED, evidencia AUSENTE. Esto es valido: "COMPLETED" no implica
+    //   que la evidencia deba seguir existiendo, solo que ninguna
+    //   eliminacion ocurrio DESPUES de COMPLETED.
+    //
+    //   Orden B (complete se linealiza antes que delete): complete pasa a
+    //   COMPLETED primero; el delete corre despues, ya no encuentra el
+    //   status IN_PROGRESS y se rechaza con 409. Resultado: delete=409,
+    //   complete=200, Maintenance COMPLETED, evidencia PRESENTE.
+    //
+    // La prueba anterior asumia que "Maintenance COMPLETED" por si solo
+    // implicaba "evidencia debe existir", lo cual es incorrecto para el
+    // Orden A. La invariante real se verifica por el status de la propia
+    // respuesta de delete, no por el estado final de Maintenance.
+    it("a delete that loses the race to completion never removes the evidence (and one that wins never leaves it after COMPLETED)", async () => {
       const maintenanceId = await createInProgressMaintenance();
       const uploadResponse = await uploadValidJpeg(maintenanceId);
       const evidenceId = uploadResponse.body.data.evidence.id;
+      const storedName = (
+        await prisma.evidence.findUnique({ where: { id: evidenceId } })
+      ).storedName;
 
       const [deleteResponse, completeResponse] = await Promise.all([
         request(app)
@@ -1050,20 +1077,100 @@ describe("Evidence routes", () => {
       expect(completeResponse.status).not.toBe(500);
       expect([200, 404, 409]).toContain(deleteResponse.status);
 
-      const persistedMaintenance = await prisma.maintenance.findUnique({
-        where: { id: maintenanceId },
-      });
       const persistedEvidence = await prisma.evidence.findUnique({
         where: { id: evidenceId },
       });
 
-      if (persistedMaintenance.status === "COMPLETED") {
-        // Invariante critica: si el mantenimiento quedo COMPLETED, la
-        // evidencia nunca debio poder eliminarse en la misma carrera.
-        expect(persistedEvidence).not.toBeNull();
-      } else if (deleteResponse.status === 200) {
+      if (deleteResponse.status === 200) {
+        // Orden A: el delete gano la carrera (se linealizo antes que
+        // complete, o complete aun no habia corrido). La evidencia y su
+        // archivo fisico deben estar ausentes, sin importar en que estado
+        // haya quedado Maintenance.
         expect(persistedEvidence).toBeNull();
+        await expect(
+          fs.access(getEvidenceFilePath(storedName)),
+        ).rejects.toThrow();
+        await expect(
+          fs.access(getQuarantineFilePath(storedName)),
+        ).rejects.toThrow();
+      } else if (deleteResponse.status === 409) {
+        // Orden B: complete gano la carrera. La evidencia y su archivo
+        // deben conservarse intactos y fuera de cuarentena (el intento de
+        // borrado se rechazo antes de tocar el filesystem, o lo restauro).
+        expect(persistedEvidence).not.toBeNull();
+        await expect(
+          fs.access(getEvidenceFilePath(storedName)),
+        ).resolves.not.toThrow();
+        await expect(
+          fs.access(getQuarantineFilePath(storedName)),
+        ).rejects.toThrow();
       }
+    });
+
+    it("deterministico: complete gana primero, el DELETE posterior se rechaza y la evidencia se conserva", async () => {
+      const maintenanceId = await createInProgressMaintenance();
+      const uploadResponse = await uploadValidJpeg(maintenanceId);
+      const evidenceId = uploadResponse.body.data.evidence.id;
+      const storedName = (
+        await prisma.evidence.findUnique({ where: { id: evidenceId } })
+      ).storedName;
+
+      const completeResponse = await completeMaintenanceReq(maintenanceId);
+      expect(completeResponse.status).toBe(200);
+
+      const deleteResponse = await request(app)
+        .delete(`${evidencesUrl(maintenanceId)}/${evidenceId}`)
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(deleteResponse.status).toBe(409);
+
+      const persistedMaintenance = await prisma.maintenance.findUnique({
+        where: { id: maintenanceId },
+      });
+      expect(persistedMaintenance.status).toBe("COMPLETED");
+
+      const persistedEvidence = await prisma.evidence.findUnique({
+        where: { id: evidenceId },
+      });
+      expect(persistedEvidence).not.toBeNull();
+      await expect(
+        fs.access(getEvidenceFilePath(storedName)),
+      ).resolves.not.toThrow();
+      await expect(
+        fs.access(getQuarantineFilePath(storedName)),
+      ).rejects.toThrow();
+    });
+
+    it("deterministico: delete gana primero, ambas operaciones tienen exito y la evidencia queda ausente", async () => {
+      const maintenanceId = await createInProgressMaintenance();
+      const uploadResponse = await uploadValidJpeg(maintenanceId);
+      const evidenceId = uploadResponse.body.data.evidence.id;
+      const storedName = (
+        await prisma.evidence.findUnique({ where: { id: evidenceId } })
+      ).storedName;
+
+      const deleteResponse = await request(app)
+        .delete(`${evidencesUrl(maintenanceId)}/${evidenceId}`)
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(deleteResponse.status).toBe(200);
+
+      const completeResponse = await completeMaintenanceReq(maintenanceId);
+      expect(completeResponse.status).toBe(200);
+
+      const persistedMaintenance = await prisma.maintenance.findUnique({
+        where: { id: maintenanceId },
+      });
+      expect(persistedMaintenance.status).toBe("COMPLETED");
+
+      const persistedEvidence = await prisma.evidence.findUnique({
+        where: { id: evidenceId },
+      });
+      expect(persistedEvidence).toBeNull();
+      await expect(
+        fs.access(getEvidenceFilePath(storedName)),
+      ).rejects.toThrow();
+      await expect(
+        fs.access(getQuarantineFilePath(storedName)),
+      ).rejects.toThrow();
     });
 
     it("at most one of two concurrent uploads persists when only one slot remains", async () => {
