@@ -60,16 +60,20 @@ DATABASE_URL="postgresql://usuario:clave@host:puerto/base_de_restauracion" ./res
 
 **Siempre contra una base de restauración separada**, nunca directamente sobre la base activa — permite validar el backup (conteos de filas, integridad) antes de promoverlo. Ver [restore.sh](../ops/backup-restore/restore.sh).
 
-**Bloqueado en esta sesión** al intentar crear la base separada `nodekeeper_restore_validation`: el rol `nodekeeper` no tiene el atributo `CREATEDB` ni es superusuario (verificado con `SELECT rolname, rolcreatedb, rolsuper FROM pg_roles WHERE rolname = current_user;` → `nodekeeper | f | f`). El backup en sí quedó validado (ver arriba); lo que no pudo probarse de punta a punta es la restauración, exclusivamente por este permiso. Para desbloquearlo, con un superusuario local (p. ej. `postgres`):
+**Validado en vivo de punta a punta** (F4 resuelto, permiso `CREATEDB` otorgado al rol `nodekeeper`): se creó `nodekeeper_restore_validation` (owner `nodekeeper`), se restauró el backup con `pg_restore --no-owner --no-acl`, y se comparó contra `nodekeeper_dev`:
 
-```sql
-ALTER ROLE nodekeeper WITH CREATEDB;
--- o, si prefieres no otorgar el permiso de forma permanente, que el
--- superusuario cree la base de restauración una sola vez:
-CREATE DATABASE nodekeeper_restore_validation OWNER nodekeeper ENCODING 'UTF8';
-```
+| Verificación | Resultado |
+|---|---|
+| Tablas (8 esperadas) | Coinciden exactamente |
+| Enums (5) | Coinciden exactamente |
+| Migraciones (`_prisma_migrations`) | 2 en ambas, `prisma migrate status` → "up to date" en la restaurada |
+| Conteos por tabla | Idénticos en ambas bases |
+| `Maintenance_networkNodeId_fkey` / `Maintenance_equipmentId_fkey` | `ON DELETE RESTRICT` presente en la restaurada (`confdeltype = 'r'`) |
+| Smoke test (backend temporal apuntando a la restaurada) | `/api/health` 200, `/api/ready` 200, `X-Request-Id` presente, login ADMIN/OPERATOR OK, `/auth/me` OK, OPERATOR permitido en `/network-nodes` y rechazado (403) en `/users`, ADMIN permitido en `/users` |
 
-Con cualquiera de las dos, `restore.sh` (o los mismos pasos manuales de esta sesión) debería poder ejecutarse de punta a punta.
+La base temporal se eliminó al finalizar (`DROP DATABASE`, con verificación literal del nombre antes de ejecutarlo).
+
+> **Lección de esta sesión (invocación segura de las herramientas nativas):** al construir el comando manualmente, verifica siempre que la cadena de conexión quede exactamente donde el flag la espera (por ejemplo `--dbname=<conexión>` como un único valor). Combinar un flag de base de datos con la cadena de conexión pasada por separado hace que la herramienta rechace el comando y, en su mensaje de error, puede reimprimir la cadena completa — exponiendo la contraseña en la salida. Preferir siempre construir el argumento completo de una sola vez.
 
 ## Health
 
@@ -119,6 +123,7 @@ Ante un error de conexión, distinguir por el código:
 | `P1000: Authentication failed` | P1000 | El servidor respondió, pero rechazó usuario/contraseña | Verificar que la contraseña en `backend/.env` coincida con la configurada para ese rol en PostgreSQL (ver detalle abajo) |
 | `P1001: Can't reach database server` | P1001 | El servidor no es alcanzable (apagado, puerto o host equivocado) | Verificar que el servicio de PostgreSQL esté corriendo y el puerto en `DATABASE_URL` sea el correcto |
 | `password authentication failed for user "..."` (código Postgres `28P01`) | — (viene del log del backend, no de Prisma CLI) | El rol existe, pero la contraseña no coincide | Igual que P1000: alinear la contraseña, no recrear el rol |
+| `permission denied to create database` | — (SQL directo, no Prisma) | El rol no tiene el atributo `CREATEDB` ni es superusuario | `ALTER ROLE nodekeeper WITH CREATEDB;` con un superusuario local, o que ese superusuario cree la base necesaria una sola vez (ver "Restore" arriba) |
 
 **Nunca se debe**: modificar `backend/.env` de forma automática, imprimir la contraseña o la cadena `DATABASE_URL` completa en ningún log o reporte.
 

@@ -50,7 +50,7 @@ No se implementa dentro de la aplicación Node (Express no termina TLS aquí): d
 
 ## Backups
 
-Procedimiento manual con `pg_dump`/`pg_restore` disponible y validado en local (backup real ejecutado y verificado con `pg_restore --list` y SHA-256; restauración en base separada diseñada pero bloqueada en esta sesión por permisos del rol, ver [RUNBOOK.md](RUNBOOK.md#restore)). En producción, esto se complementaría con la herramienta de backup propia del proveedor de PostgreSQL (snapshots gestionados o `pg_dump` programado) más, si aplica, backup del volumen de `backend/uploads/evidences`; no implementado como automatización en este repositorio.
+Procedimiento manual con `pg_dump`/`pg_restore`, **validado en local de punta a punta**: backup real, restauración en una base separada, comparación de estructura/conteos/constraints y smoke test funcional contra la base restaurada, todos exitosos (ver [RUNBOOK.md](RUNBOOK.md#restore) para el detalle). En producción, esto se complementaría con la herramienta de backup propia del proveedor de PostgreSQL (snapshots gestionados o `pg_dump` programado) más, si aplica, backup del volumen de `backend/uploads/evidences`; no implementado como automatización en este repositorio.
 
 ## Logs
 
