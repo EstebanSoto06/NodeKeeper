@@ -13,7 +13,7 @@ Este documento describe la suite de pruebas realmente implementada, no la planif
 ```bash
 cd backend
 npm run db:validate   # valida el esquema de Prisma
-npm test              # 230 pruebas
+npm test              # 243 pruebas
 ```
 
 ## Frontend — Vitest + React Testing Library
@@ -49,7 +49,7 @@ Umbrales mínimos configurados en `frontend/vite.config.js` (`test.coverage.thre
 | Lines | 55% |
 | Branches | 45% |
 
-El backend no impone un umbral de cobertura configurado; su cobertura funcional se sostiene con 230 pruebas de integración contra una base de datos real.
+El backend no impone un umbral de cobertura configurado; su cobertura funcional se sostiene con 243 pruebas de integración contra una base de datos real.
 
 ## Fixtures
 
