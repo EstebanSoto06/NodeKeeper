@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -17,6 +17,13 @@ vi.mock('../store/store.js', () => ({ showToast: vi.fn() }));
 // El click "vacio" del mapa se simula clickeando el propio contenedor
 // mockeado; useMapEvents guarda el handler real de NodeMap.jsx para poder
 // dispararlo con una coordenada fija y predecible.
+// setView/fitBounds/invalidateSize son instancias COMPARTIDAS (no una nueva
+// por llamada a useMap()) para poder verificar hacia donde se movio el mapa
+// desde las pruebas; whenReady se resuelve sincronicamente.
+const setViewMock = vi.fn();
+const fitBoundsMock = vi.fn();
+const invalidateSizeMock = vi.fn();
+
 vi.mock('react-leaflet', () => {
   let clickHandler = null;
   return {
@@ -39,7 +46,12 @@ vi.mock('react-leaflet', () => {
       </div>
     ),
     Popup: ({ children }) => <div>{children}</div>,
-    useMap: () => ({ fitBounds: vi.fn(), setView: vi.fn() }),
+    useMap: () => ({
+      setView: setViewMock,
+      fitBounds: fitBoundsMock,
+      invalidateSize: invalidateSizeMock,
+      whenReady: (cb) => cb(),
+    }),
     useMapEvents: (handlers) => { clickHandler = handlers.click; return null; },
   };
 });
@@ -59,6 +71,14 @@ function mockLoad({ nodes = [fixtureNodeAvailable], allNodes = nodes, equip = fi
 describe('Map', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // El foco puntual programa el setView un frame despues (ver
+    // MapViewportController en NodeMap.jsx); se resuelve sincronicamente
+    // para no depender de temporizadores reales en las pruebas.
+    vi.stubGlobal('requestAnimationFrame', (cb) => { cb(); return 0; });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renderiza el mapa real (Leaflet) con los nodos cargados como marcadores', async () => {
@@ -100,7 +120,7 @@ describe('Map', () => {
     expect(screen.getByText('Detalle del nodo real')).toBeInTheDocument();
   });
 
-  it('al llegar con ?nodeId=<id> (boton "Ubicar" de NodeDetail) selecciona automaticamente ese nodo', async () => {
+  it('al llegar con ?nodeId=<id> (boton "Ubicar" de NodeDetail) centra el mapa en el nodo y lo selecciona', async () => {
     mockLoad();
     renderWithProviders(<Map />, {
       authValue: adminAuthValue(),
@@ -109,9 +129,18 @@ describe('Map', () => {
 
     await waitFor(() => expect(screen.getAllByText(fixtureNodeAvailable.name).length).toBeGreaterThan(0));
     expect(screen.getAllByText(fixtureNodeAvailable.code).length).toBeGreaterThan(0);
+
+    // El foco debe centrar y hacer zoom (16) sobre las coordenadas reales del
+    // nodo, no solo actualizar el panel lateral — esto es justamente lo que
+    // fallaba en el navegador real antes de este fix.
+    await waitFor(() => expect(setViewMock).toHaveBeenCalledWith(
+      [fixtureNodeAvailable.latitude, fixtureNodeAvailable.longitude],
+      16,
+      { animate: true, duration: 0.4 },
+    ));
   });
 
-  it('si el ?nodeId de la URL no existe entre los nodos con coordenadas, no rompe el mapa ni selecciona nada', async () => {
+  it('si el ?nodeId de la URL no existe entre los nodos con coordenadas, no rompe el mapa ni selecciona/centra nada', async () => {
     mockLoad();
     renderWithProviders(<Map />, {
       authValue: adminAuthValue(),
@@ -120,6 +149,7 @@ describe('Map', () => {
 
     expect(await screen.findByTestId('map-container')).toBeInTheDocument();
     expect(screen.getByText('Selecciona un nodo')).toBeInTheDocument();
+    expect(setViewMock).not.toHaveBeenCalledWith(expect.anything(), 16, expect.anything());
   });
 
   it('ADMIN: al hacer click en un punto vacio del mapa, abre el formulario de creacion con lat/lng prellenadas', async () => {

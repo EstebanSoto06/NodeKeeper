@@ -64,7 +64,18 @@ export function Map() {
     if (exists) setSelectedId(focusNodeId);
   }, [mapData, focusNodeId]);
 
-  const visibleNodes = nodesWithCoords.filter((n) => !hidden[n.status]);
+  // El nodo enfocado por URL debe poder centrarse y verse aunque su estado
+  // este oculto por la leyenda: se busca en TODOS los nodos con coordenadas
+  // (no en la lista ya filtrada) y, si el filtro lo escondia, se agrega de
+  // vuelta a los nodos visibles para que su marcador se dibuje.
+  const focusNode = focusNodeId ? nodesWithCoords.find((n) => n.id === focusNodeId) ?? null : null;
+
+  const visibleNodes = useMemo(() => {
+    const base = nodesWithCoords.filter((n) => !hidden[n.status]);
+    if (!focusNode || base.some((n) => n.id === focusNode.id)) return base;
+    return [...base, focusNode];
+  }, [nodesWithCoords, hidden, focusNode]);
+
   const counts = { AVAILABLE: 0, MAINTENANCE: 0, OUT_OF_SERVICE: 0 };
   nodesWithCoords.forEach((n) => { if (counts[n.status] !== undefined) counts[n.status]++; });
   const selectedNode = nodesWithCoords.find((n) => n.id === selectedId);
@@ -108,7 +119,7 @@ export function Map() {
               onViewDetail={(id) => navigate(`/nodos/${id}`)}
               tempMarker={tempCoords}
               onMapClick={handleMapClick}
-              focusNodeId={focusNodeId}
+              focusNode={focusNode}
             />
 
             <div className="nk-map-legend">

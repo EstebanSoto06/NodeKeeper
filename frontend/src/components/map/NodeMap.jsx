@@ -34,39 +34,47 @@ const TEMP_ICON = L.divIcon({
   popupAnchor: [0, -24],
 });
 
-// Sincroniza el encuadre del mapa con el conjunto de puntos visibles (nodos +
-// marcador temporal). Vive dentro de <MapContainer> porque necesita la
-// instancia real del mapa via useMap().
-function FitBounds({ points }) {
-  const map = useMap();
-  const key = points.map((p) => p.join(',')).join('|');
-
-  useEffect(() => {
-    if (points.length === 0) {
-      map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
-    } else if (points.length === 1) {
-      map.setView(points[0], SINGLE_POINT_ZOOM);
-    } else {
-      map.fitBounds(L.latLngBounds(points), { padding: [32, 32] });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  return null;
-}
-
-// Centra/enfoca un nodo puntual (llegada desde NodeDetail via "Ubicar" ->
-// ?nodeId=...). Se monta DESPUES de <FitBounds> en el arbol, para que React
-// dispare su efecto despues y su encuadre prevalezca sobre el fitBounds
-// inicial. Solo se renderiza cuando el nodo enfocado existe y tiene
-// coordenadas (ver NodeMap mas abajo), asi que aqui no hace falta validar.
-function FocusNode({ node }) {
+// Controlador unico del viewport (reemplaza los antiguos FitBounds +
+// FocusNode separados: dos efectos independientes compitiendo por
+// map.setView en el mismo commit resultaba fragil en el navegador real —
+// las pruebas con react-leaflet mockeado no lo detectaban porque el mock no
+// reproduce los tiempos reales de Leaflet). Un unico efecto decide, en
+// orden de prioridad, que vista aplicar:
+//   1. foco puntual (?nodeId= desde NodeDetail "Ubicar"), si hay uno;
+//   2. si no, el encuadre normal (fallback / punto unico / fitBounds).
+// map.whenReady() asegura que el mapa ya tiene tamano/posicion calculados
+// antes de tocar la vista; invalidateSize() lo fuerza a releer su
+// contenedor (util si el layout cambio despues del primer render); el
+// requestAnimationFrame adicional del foco le da un frame de margen a
+// Leaflet antes de saltar a un zoom alto puntual.
+function MapViewportController({ points, focusNode }) {
   const map = useMap();
 
+  const pointsKey = points.map((p) => p.join(',')).join('|');
+  const focusKey = focusNode ? `${focusNode.id}:${focusNode.latitude}:${focusNode.longitude}` : '';
+
   useEffect(() => {
-    map.setView([node.latitude, node.longitude], FOCUS_ZOOM);
+    map.whenReady(() => {
+      map.invalidateSize();
+
+      if (focusNode) {
+        const target = [Number(focusNode.latitude), Number(focusNode.longitude)];
+        requestAnimationFrame(() => {
+          map.setView(target, FOCUS_ZOOM, { animate: true, duration: 0.4 });
+        });
+        return;
+      }
+
+      if (points.length === 0) {
+        map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
+      } else if (points.length === 1) {
+        map.setView(points[0], SINGLE_POINT_ZOOM);
+      } else {
+        map.fitBounds(L.latLngBounds(points), { padding: [32, 32] });
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node.id]);
+  }, [map, pointsKey, focusKey]);
 
   return null;
 }
@@ -88,16 +96,11 @@ function ClickCapture({ onMapClick }) {
   return null;
 }
 
-export function NodeMap({ nodes, selectedId, onSelectNode, onViewDetail, tempMarker, onMapClick, focusNodeId }) {
+export function NodeMap({ nodes, selectedId, onSelectNode, onViewDetail, tempMarker, onMapClick, focusNode }) {
   const points = useMemo(() => {
     const nodePoints = nodes.map((n) => [n.latitude, n.longitude]);
     return tempMarker ? [...nodePoints, [tempMarker.lat, tempMarker.lng]] : nodePoints;
   }, [nodes, tempMarker]);
-
-  // Si el nodo enfocado no esta en `nodes` (aun no cargo, o no tiene
-  // coordenadas) simplemente no se monta <FocusNode>: el mapa no se rompe,
-  // solo conserva el encuadre de FitBounds.
-  const focusNode = focusNodeId ? nodes.find((n) => n.id === focusNodeId) : null;
 
   return (
     <MapContainer center={FALLBACK_CENTER} zoom={FALLBACK_ZOOM} className="nk-leaflet-map" scrollWheelZoom>
@@ -105,8 +108,7 @@ export function NodeMap({ nodes, selectedId, onSelectNode, onViewDetail, tempMar
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <FitBounds points={points} />
-      {focusNode && <FocusNode node={focusNode} />}
+      <MapViewportController points={points} focusNode={focusNode} />
       <ClickCapture onMapClick={onMapClick} />
 
       {nodes.map((n) => (
