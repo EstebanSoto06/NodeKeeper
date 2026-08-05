@@ -54,27 +54,39 @@ export function Map() {
   const [hidden, setHidden] = useState({});
   const [tempCoords, setTempCoords] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  // Foco del nodo recien creado desde el mapa: solo coordenadas (lo unico
+  // que se conoce de inmediato, antes de que termine el reload de
+  // /network-nodes/map), para poder centrar el viewport sin esperar a que
+  // el nodo real aparezca en `nodesWithCoords`.
+  const [createdFocusNode, setCreatedFocusNode] = useState(null);
 
   // Llegada desde NodeDetail ("Ubicar"): si el nodo de la URL ya cargo y
   // tiene coordenadas, se selecciona para que el panel lo muestre y
-  // NodeMap lo enfoque (ver prop focusNodeId mas abajo).
+  // NodeMap lo enfoque (ver prop focusNode mas abajo).
   useEffect(() => {
     if (!mapData || !focusNodeId) return;
     const exists = (mapData.networkNodes ?? []).some((n) => n.id === focusNodeId);
     if (exists) setSelectedId(focusNodeId);
   }, [mapData, focusNodeId]);
 
-  // El nodo enfocado por URL debe poder centrarse y verse aunque su estado
-  // este oculto por la leyenda: se busca en TODOS los nodos con coordenadas
-  // (no en la lista ya filtrada) y, si el filtro lo escondia, se agrega de
-  // vuelta a los nodos visibles para que su marcador se dibuje.
-  const focusNode = focusNodeId ? nodesWithCoords.find((n) => n.id === focusNodeId) ?? null : null;
+  // El nodo enfocado por URL o por creacion reciente: primero se busca el
+  // nodo REAL (ya cargado, con todos sus campos) por ese id; si el reload
+  // aun no lo trae (recien creado, respuesta de /network-nodes/map en
+  // vuelo o desactualizada), se usa `createdFocusNode` como respaldo -solo
+  // conoce id/lat/lng- unicamente para centrar el viewport de inmediato.
+  const effectiveFocusNodeId = focusNodeId || createdFocusNode?.id || null;
+  const realFocusNode = effectiveFocusNodeId ? nodesWithCoords.find((n) => n.id === effectiveFocusNodeId) ?? null : null;
+  const focusNode = realFocusNode || (createdFocusNode?.id === effectiveFocusNodeId ? createdFocusNode : null);
 
+  // La reintegracion en los nodos visibles (cuando el filtro de la leyenda
+  // lo esconde) SOLO aplica al nodo real y completo: el respaldo
+  // `createdFocusNode` no tiene status/code/name y generaria un marcador
+  // "fantasma" a medio llenar en el mapa.
   const visibleNodes = useMemo(() => {
     const base = nodesWithCoords.filter((n) => !hidden[n.status]);
-    if (!focusNode || base.some((n) => n.id === focusNode.id)) return base;
-    return [...base, focusNode];
-  }, [nodesWithCoords, hidden, focusNode]);
+    if (!realFocusNode || base.some((n) => n.id === realFocusNode.id)) return base;
+    return [...base, realFocusNode];
+  }, [nodesWithCoords, hidden, realFocusNode]);
 
   const counts = { AVAILABLE: 0, MAINTENANCE: 0, OUT_OF_SERVICE: 0 };
   nodesWithCoords.forEach((n) => { if (counts[n.status] !== undefined) counts[n.status]++; });
@@ -95,9 +107,31 @@ export function Map() {
   }
 
   function handleCreated(createdNode) {
+    handleCreateClosed();
+
     reloadMap();
     reloadAllNodes();
-    if (createdNode?.id) setSelectedId(createdNode.id);
+
+    if (!createdNode?.id) return;
+
+    setSelectedId(createdNode.id);
+
+    // Si el estado del nodo recien creado estaba oculto por un filtro de la
+    // leyenda, se revela: de lo contrario su marcador quedaria invisible en
+    // cuanto llegue el reload, justo el nodo que el usuario acaba de crear.
+    if (createdNode.status && hidden[createdNode.status]) {
+      setHidden((h) => ({ ...h, [createdNode.status]: false }));
+    }
+
+    if (createdNode.latitude == null || createdNode.longitude == null) return;
+
+    setCreatedFocusNode({
+      id: createdNode.id,
+      latitude: Number(createdNode.latitude),
+      longitude: Number(createdNode.longitude),
+    });
+
+    navigate(`/mapa?nodeId=${createdNode.id}`, { replace: true });
   }
 
   return (

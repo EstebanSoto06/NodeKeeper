@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { Map } from './Map.jsx';
 import { renderWithProviders, adminAuthValue, operatorAuthValue, makeApiError } from '../test/test-utils.jsx';
 import { fixtureNodeAvailable, fixtureNodeMaintenance, fixtureEquipment } from '../test/fixtures.js';
@@ -66,6 +66,18 @@ function mockLoad({ nodes = [fixtureNodeAvailable], allNodes = nodes, equip = fi
   networkNodeService.map.mockResolvedValueOnce({ networkNodes: nodes });
   networkNodeService.list.mockResolvedValueOnce({ networkNodes: allNodes });
   equipmentService.list.mockResolvedValueOnce({ equipment: equip });
+}
+
+// Expone la ruta actual (pathname + query) junto al mapa, para poder
+// verificar que la creacion de un nodo actualiza la URL a ?nodeId=<id>.
+function MapWithLocationProbe() {
+  const location = useLocation();
+  return (
+    <>
+      <div data-testid="location-probe">{location.pathname}{location.search}</div>
+      <Map />
+    </>
+  );
 }
 
 describe('Map', () => {
@@ -166,16 +178,22 @@ describe('Map', () => {
     expect(showToast).not.toHaveBeenCalled();
   });
 
-  it('ADMIN: al guardar el formulario del mapa, llama a create con el payload correcto (incluida latitud/longitud)', async () => {
+  it('ADMIN: al guardar el formulario del mapa, llama a create con el payload correcto, cierra el modal, limpia el marcador temporal, actualiza la URL y centra el nodo recien creado', async () => {
     const user = userEvent.setup();
     mockLoad();
-    networkNodeService.create.mockResolvedValueOnce({ networkNode: { ...fixtureNodeAvailable, id: 'node-nuevo', latitude: 10.5, longitude: -84.5 } });
+    const created = { ...fixtureNodeAvailable, id: 'node-nuevo', latitude: 10.5, longitude: -84.5 };
+    networkNodeService.create.mockResolvedValueOnce({ networkNode: created });
+    // El reload de /network-nodes/map termina, pero (por ejemplo, eventual
+    // consistency) TODAVIA no incluye al nodo recien creado: el centrado
+    // debe depender de createdFocusNode, no de los datos recargados.
+    networkNodeService.map.mockResolvedValueOnce({ networkNodes: [fixtureNodeAvailable] });
 
-    renderWithProviders(<Map />, { authValue: adminAuthValue() });
+    renderWithProviders(<MapWithLocationProbe />, { authValue: adminAuthValue(), initialEntries: ['/mapa'] });
 
     await screen.findByTestId('map-container');
     await user.click(screen.getByTestId('map-container'));
     await screen.findByText('Crear nodo en esta ubicación');
+    expect(screen.getAllByTestId('marker')).toHaveLength(2); // nodo existente + marcador temporal
 
     await user.type(screen.getByPlaceholderText('NODO-014'), 'NODO-MAPA-01');
     await user.type(screen.getByPlaceholderText('Subestación San Isidro'), 'Nodo creado desde el mapa');
@@ -191,7 +209,77 @@ describe('Map', () => {
       longitude: -84.5,
     });
 
+    // Modal cerrado y marcador temporal limpiado; una vez el reload
+    // termina (con datos que aun no incluyen al nodo nuevo), solo queda el
+    // marcador del nodo existente.
     await waitFor(() => expect(screen.queryByText('Crear nodo en esta ubicación')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+
+    // URL actualizada al nodo recien creado.
+    await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent(`/mapa?nodeId=${created.id}`));
+
+    // Centrado/zoom (16) sobre el nodo recien creado via createdFocusNode.
+    await waitFor(() => expect(setViewMock).toHaveBeenCalledWith(
+      [created.latitude, created.longitude],
+      16,
+      { animate: true, duration: 0.4 },
+    ));
+  });
+
+  it('ADMIN: una vez el reload trae al nodo recien creado, el panel lateral y su marcador lo muestran', async () => {
+    const user = userEvent.setup();
+    mockLoad();
+    const created = { ...fixtureNodeAvailable, id: 'node-nuevo', name: 'Nodo Nuevo Desde Mapa', code: 'NODO-MAPA-01', latitude: 10.5, longitude: -84.5 };
+    networkNodeService.create.mockResolvedValueOnce({ networkNode: created });
+    networkNodeService.map.mockResolvedValueOnce({ networkNodes: [fixtureNodeAvailable, created] });
+    networkNodeService.list.mockResolvedValueOnce({ networkNodes: [fixtureNodeAvailable, created] });
+
+    renderWithProviders(<Map />, { authValue: adminAuthValue() });
+
+    await screen.findByTestId('map-container');
+    await user.click(screen.getByTestId('map-container'));
+    await screen.findByText('Crear nodo en esta ubicación');
+    await user.type(screen.getByPlaceholderText('NODO-014'), created.code);
+    await user.type(screen.getByPlaceholderText('Subestación San Isidro'), created.name);
+    await user.click(screen.getByText('Crear nodo aquí'));
+
+    await waitFor(() => expect(screen.getByTitle(created.name)).toBeInTheDocument());
+    expect(screen.getAllByText(created.name).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(created.code).length).toBeGreaterThan(0);
+  });
+
+  it('si el estado del nodo recien creado estaba oculto por un filtro de la leyenda, se revela automaticamente', async () => {
+    const user = userEvent.setup();
+    mockLoad();
+    const created = { ...fixtureNodeAvailable, id: 'node-nuevo', status: 'OUT_OF_SERVICE', latitude: 10.5, longitude: -84.5 };
+    networkNodeService.create.mockResolvedValueOnce({ networkNode: created });
+    networkNodeService.map.mockResolvedValueOnce({ networkNodes: [fixtureNodeAvailable, created] });
+    networkNodeService.list.mockResolvedValueOnce({ networkNodes: [fixtureNodeAvailable, created] });
+
+    const { container } = renderWithProviders(<Map />, { authValue: adminAuthValue() });
+
+    await screen.findByTitle(fixtureNodeAvailable.name);
+    // Acotado a la leyenda: una vez creado el nodo OUT_OF_SERVICE, su Popup
+    // tambien muestra el texto "Fuera de servicio" (StatusBadge), asi que
+    // buscarlo en toda la pagina seria ambiguo. Se re-consulta en vivo (no
+    // se cachea el nodo) porque el reload dispara un mapLoading intermedio
+    // que reemplaza el subarbol del mapa (incluida la leyenda) por uno
+    // nuevo: una referencia capturada antes quedaria apuntando al nodo
+    // DOM viejo, ya desmontado.
+    const legendToggle = () => within(container.querySelector('.nk-map-legend')).getByText('Fuera de servicio').closest('button');
+
+    // Oculta "Fuera de servicio" en la leyenda ANTES de crear el nodo.
+    await user.click(legendToggle());
+    expect(legendToggle()).toHaveClass('is-off');
+
+    await user.click(screen.getByTestId('map-container'));
+    await screen.findByText('Crear nodo en esta ubicación');
+    await user.type(screen.getByPlaceholderText('NODO-014'), 'NODO-MAPA-03');
+    await user.type(screen.getByPlaceholderText('Subestación San Isidro'), 'Nodo fuera de servicio');
+    await user.click(screen.getByText('Crear nodo aquí'));
+
+    await waitFor(() => expect(networkNodeService.create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legendToggle()).not.toHaveClass('is-off'));
   });
 
   it('OPERATOR: al hacer click en el mapa, no abre el formulario de creacion y muestra un aviso de solo lectura', async () => {
