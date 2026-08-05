@@ -10,8 +10,8 @@
    en el mapa solo recibe un aviso discreto (toast) de que no tiene permiso —
    el backend tambien lo rechazaria (POST /network-nodes es solo ADMIN), esto
    es unicamente para no ofrecer una accion imposible. */
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader, Empty } from '../components/Misc.jsx';
 import { Button } from '../components/Button.jsx';
 import { Card } from '../components/Card.jsx';
@@ -32,6 +32,8 @@ const STATUS_ORDER = ['AVAILABLE', 'MAINTENANCE', 'OUT_OF_SERVICE'];
 
 export function Map() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusNodeId = searchParams.get('nodeId');
   const { isAdmin } = usePermissions();
   const { data: mapData, error: mapError, loading: mapLoading, reload: reloadMap } = useAsync(() => networkNodeService.map(), []);
   const { data: allNodesData, reload: reloadAllNodes } = useAsync(() => networkNodeService.list(), []);
@@ -52,6 +54,15 @@ export function Map() {
   const [hidden, setHidden] = useState({});
   const [tempCoords, setTempCoords] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Llegada desde NodeDetail ("Ubicar"): si el nodo de la URL ya cargo y
+  // tiene coordenadas, se selecciona para que el panel lo muestre y
+  // NodeMap lo enfoque (ver prop focusNodeId mas abajo).
+  useEffect(() => {
+    if (!mapData || !focusNodeId) return;
+    const exists = (mapData.networkNodes ?? []).some((n) => n.id === focusNodeId);
+    if (exists) setSelectedId(focusNodeId);
+  }, [mapData, focusNodeId]);
 
   const visibleNodes = nodesWithCoords.filter((n) => !hidden[n.status]);
   const counts = { AVAILABLE: 0, MAINTENANCE: 0, OUT_OF_SERVICE: 0 };
@@ -97,6 +108,7 @@ export function Map() {
               onViewDetail={(id) => navigate(`/nodos/${id}`)}
               tempMarker={tempCoords}
               onMapClick={handleMapClick}
+              focusNodeId={focusNodeId}
             />
 
             <div className="nk-map-legend">

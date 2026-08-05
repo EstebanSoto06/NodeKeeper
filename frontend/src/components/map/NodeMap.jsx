@@ -13,6 +13,7 @@ import { resolveStatus } from '../../utils/statusMaps.js';
 const FALLBACK_CENTER = [10.327, -84.427];
 const FALLBACK_ZOOM = 10;
 const SINGLE_POINT_ZOOM = 13;
+const FOCUS_ZOOM = 16;
 
 function statusIcon(status, isActive) {
   const cfg = resolveStatus('node', status);
@@ -54,6 +55,22 @@ function FitBounds({ points }) {
   return null;
 }
 
+// Centra/enfoca un nodo puntual (llegada desde NodeDetail via "Ubicar" ->
+// ?nodeId=...). Se monta DESPUES de <FitBounds> en el arbol, para que React
+// dispare su efecto despues y su encuadre prevalezca sobre el fitBounds
+// inicial. Solo se renderiza cuando el nodo enfocado existe y tiene
+// coordenadas (ver NodeMap mas abajo), asi que aqui no hace falta validar.
+function FocusNode({ node }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView([node.latitude, node.longitude], FOCUS_ZOOM);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id]);
+
+  return null;
+}
+
 // Captura clicks en un punto vacio del mapa (sin tocar un marcador) y los
 // reporta al padre; no renderiza nada visible.
 function ClickCapture({ onMapClick }) {
@@ -71,11 +88,16 @@ function ClickCapture({ onMapClick }) {
   return null;
 }
 
-export function NodeMap({ nodes, selectedId, onSelectNode, onViewDetail, tempMarker, onMapClick }) {
+export function NodeMap({ nodes, selectedId, onSelectNode, onViewDetail, tempMarker, onMapClick, focusNodeId }) {
   const points = useMemo(() => {
     const nodePoints = nodes.map((n) => [n.latitude, n.longitude]);
     return tempMarker ? [...nodePoints, [tempMarker.lat, tempMarker.lng]] : nodePoints;
   }, [nodes, tempMarker]);
+
+  // Si el nodo enfocado no esta en `nodes` (aun no cargo, o no tiene
+  // coordenadas) simplemente no se monta <FocusNode>: el mapa no se rompe,
+  // solo conserva el encuadre de FitBounds.
+  const focusNode = focusNodeId ? nodes.find((n) => n.id === focusNodeId) : null;
 
   return (
     <MapContainer center={FALLBACK_CENTER} zoom={FALLBACK_ZOOM} className="nk-leaflet-map" scrollWheelZoom>
@@ -84,6 +106,7 @@ export function NodeMap({ nodes, selectedId, onSelectNode, onViewDetail, tempMar
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitBounds points={points} />
+      {focusNode && <FocusNode node={focusNode} />}
       <ClickCapture onMapClick={onMapClick} />
 
       {nodes.map((n) => (

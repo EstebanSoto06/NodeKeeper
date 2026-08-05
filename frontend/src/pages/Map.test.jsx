@@ -100,6 +100,28 @@ describe('Map', () => {
     expect(screen.getByText('Detalle del nodo real')).toBeInTheDocument();
   });
 
+  it('al llegar con ?nodeId=<id> (boton "Ubicar" de NodeDetail) selecciona automaticamente ese nodo', async () => {
+    mockLoad();
+    renderWithProviders(<Map />, {
+      authValue: adminAuthValue(),
+      initialEntries: [`/mapa?nodeId=${fixtureNodeAvailable.id}`],
+    });
+
+    await waitFor(() => expect(screen.getAllByText(fixtureNodeAvailable.name).length).toBeGreaterThan(0));
+    expect(screen.getAllByText(fixtureNodeAvailable.code).length).toBeGreaterThan(0);
+  });
+
+  it('si el ?nodeId de la URL no existe entre los nodos con coordenadas, no rompe el mapa ni selecciona nada', async () => {
+    mockLoad();
+    renderWithProviders(<Map />, {
+      authValue: adminAuthValue(),
+      initialEntries: ['/mapa?nodeId=nodo-inexistente'],
+    });
+
+    expect(await screen.findByTestId('map-container')).toBeInTheDocument();
+    expect(screen.getByText('Selecciona un nodo')).toBeInTheDocument();
+  });
+
   it('ADMIN: al hacer click en un punto vacio del mapa, abre el formulario de creacion con lat/lng prellenadas', async () => {
     const user = userEvent.setup();
     mockLoad();

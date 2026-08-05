@@ -98,7 +98,7 @@ SPA disponible en `http://localhost:5173`.
 
 ```bash
 npm run test:backend    # Vitest + Supertest, 245 pruebas
-npm run test:frontend   # Vitest + React Testing Library, 129 pruebas
+npm run test:frontend   # Vitest + React Testing Library, 139 pruebas
 ```
 
 Estrategia, fixtures y comandos detallados en [docs/TESTING.md](docs/TESTING.md).
@@ -143,7 +143,7 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 
 ## Estado del proyecto
 
-MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa real con Leaflet/OpenStreetMap, reportes) y gestión de usuarios están implementados y probados (245 pruebas backend, 129 pruebas frontend). El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El despliegue público queda fuera de este alcance.
+MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa real con Leaflet/OpenStreetMap, reportes) y gestión de usuarios están implementados y probados (245 pruebas backend, 139 pruebas frontend). El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El despliegue público queda fuera de este alcance.
 
 ## Autor
 
