@@ -12,7 +12,7 @@ El seguimiento de mantenimientos preventivos y correctivos de nodos, equipos y p
 - Gestión de usuarios, nodos, equipos y proveedores de soporte.
 - Mantenimientos preventivos (asociados a un nodo) y correctivos (asociados a un equipo), con checklist obligatorio antes del cierre.
 - Carga de evidencias reales (JPG, PNG, PDF, DOCX) con validación del contenido real del archivo, no solo su extensión o tipo declarado.
-- Dashboard, calendario, mapa de nodos y reportes exportables a CSV, todos sobre datos reales de la API.
+- Dashboard, calendario, mapa real de nodos (Leaflet/OpenStreetMap, con creación de nodos por ADMIN al hacer clic en el mapa) y reportes exportables a CSV, todos sobre datos reales de la API.
 
 ## Roles
 
@@ -23,7 +23,7 @@ El seguimiento de mantenimientos preventivos y correctivos de nodos, equipos y p
 
 | Capa | Tecnologías |
 |---|---|
-| Frontend | React 18, Vite, React Router, Tailwind CSS |
+| Frontend | React 18, Vite, React Router, Tailwind CSS, Leaflet/React-Leaflet |
 | Backend | Node.js, Express, Prisma ORM, PostgreSQL, JWT, bcrypt, Multer, Zod |
 | Pruebas | Vitest + Supertest (backend), Vitest + React Testing Library (frontend) |
 
@@ -97,8 +97,8 @@ SPA disponible en `http://localhost:5173`.
 ## Pruebas
 
 ```bash
-npm run test:backend    # Vitest + Supertest, 243 pruebas
-npm run test:frontend   # Vitest + React Testing Library, 123 pruebas
+npm run test:backend    # Vitest + Supertest, 245 pruebas
+npm run test:frontend   # Vitest + React Testing Library, 129 pruebas
 ```
 
 Estrategia, fixtures y comandos detallados en [docs/TESTING.md](docs/TESTING.md).
@@ -126,7 +126,6 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 ## Limitaciones conocidas
 
 - Sin despliegue público todavía: este bloque prepara CI y documentación, no publica el sistema en internet (ver [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
-- El mapa de nodos es una proyección ilustrativa de coordenadas reales, no un mapa de terceros (Leaflet/Mapbox) integrado.
 - Fuera del alcance del MVP: notificaciones por correo/SMS, integraciones externas, tiempo real con WebSockets (ver [docs/requirements/MVP_SCOPE.md](docs/requirements/MVP_SCOPE.md)).
 
 ## Documentación
@@ -144,7 +143,7 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 
 ## Estado del proyecto
 
-MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa, reportes) y gestión de usuarios están implementados y probados (243 pruebas backend, 123 pruebas frontend). El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El despliegue público queda fuera de este alcance.
+MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa real con Leaflet/OpenStreetMap, reportes) y gestión de usuarios están implementados y probados (245 pruebas backend, 129 pruebas frontend). El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El despliegue público queda fuera de este alcance.
 
 ## Autor
 

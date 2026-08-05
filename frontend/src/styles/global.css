@@ -338,26 +338,24 @@ button { font-family: inherit; }
 .nk-healthbar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; }
 .nk-healthbar > div { transition: flex var(--duration-base); }
 
-/* ---------- Map ---------- */
+/* ---------- Map (Leaflet real) ---------- */
 .nk-map-wrap { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
 @media (max-width: 860px) { .nk-map-wrap { grid-template-columns: 1fr; } }
-.nk-map { position: relative; border: 1px solid var(--border-1); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-xs); min-height: 460px; }
-.nk-map-canvas { position: absolute; inset: 0; background: linear-gradient(180deg, #EAF0F6, #E3EAF2); }
-.nk-map-grid { position: absolute; inset: 0; background-image:
-  linear-gradient(rgba(30,63,99,0.06) 1px, transparent 1px),
-  linear-gradient(90deg, rgba(30,63,99,0.06) 1px, transparent 1px);
-  background-size: 44px 44px; }
-.nk-map-land { position: absolute; background: rgba(34,168,98,0.08); border: 1px solid rgba(34,168,98,0.14); border-radius: 30% 60% 50% 40%; }
-.nk-map-road { position: absolute; height: 4px; background: rgba(255,255,255,0.7); border-radius: 4px; box-shadow: 0 0 0 1px rgba(30,63,99,0.05); transform-origin: left center; }
-.nk-map-placeholder-note { position: absolute; left: 12px; bottom: 10px; font-size: 10px; color: var(--fg-3); font-family: var(--font-mono); background: rgba(255,255,255,0.7); padding: 3px 8px; border-radius: 99px; backdrop-filter: blur(4px); }
-.nk-marker { position: absolute; transform: translate(-50%, -100%); background: none; border: none; cursor: pointer; padding: 0; z-index: 2; transition: transform var(--duration-fast); }
-.nk-marker:hover { transform: translate(-50%, -106%); }
-.nk-marker.is-active { z-index: 5; }
-.nk-marker.is-active .nk-marker-pin { box-shadow: var(--shadow-md), 0 0 0 4px rgba(37,99,201,0.25); }
-.nk-marker-pin { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+/* z-index:0 (en vez de auto) confina los panes/controles internos de Leaflet
+   (algunos usan z-index:1000 por defecto) dentro de este contenedor, para que
+   nunca se dibujen por encima del modal de creacion de nodo u otros overlays
+   de la app que tienen z-index mas bajo en terminos absolutos. */
+.nk-map { position: relative; z-index: 0; border: 1px solid var(--border-1); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-xs); min-height: 560px; }
+@media (max-width: 860px) { .nk-map { min-height: 420px; } }
+.nk-leaflet-map { height: 100%; width: 100%; background: #EAF0F6; font-family: var(--font-sans); }
+.nk-leaflet-marker { background: none; border: none; }
+.nk-leaflet-pin { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: var(--shadow-md); }
-.nk-marker-inner { width: 8px; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.9); transform: rotate(45deg); }
-.nk-marker-count { transform: rotate(45deg); font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: #fff; }
+.nk-leaflet-pin.is-active { box-shadow: var(--shadow-md), 0 0 0 4px rgba(37,99,201,0.25); }
+.nk-leaflet-pin--temp { background: var(--blue-500); animation: nk-temp-pin-pulse 1.4s ease-in-out infinite; }
+.nk-leaflet-pin-dot { width: 7px; height: 7px; border-radius: 99px; background: rgba(255,255,255,0.9); transform: rotate(45deg); }
+@keyframes nk-temp-pin-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.nk-leaflet-popup { min-width: 180px; font-size: 13px; }
 .nk-map-legend { position: absolute; top: 12px; right: 12px; background: var(--glass-bg-strong); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 6px; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--glass-shadow); }
 .nk-legend-item { display: flex; align-items: center; gap: 8px; background: none; border: none; cursor: pointer;
