@@ -47,4 +47,37 @@ describe('NodeFormModal', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('con initialCoords (creacion desde el mapa), prellena latitud/longitud de solo lectura y las incluye en el payload', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    const createdNode = { id: 'n2', latitude: 10.5, longitude: -84.5 };
+    networkNodeService.create.mockResolvedValueOnce({ networkNode: createdNode });
+
+    render(
+      <NodeFormModal
+        initialCoords={{ latitude: 10.5, longitude: -84.5 }}
+        onClose={vi.fn()}
+        onSaved={onSaved}
+      />,
+    );
+
+    expect(screen.getByText('Crear nodo en esta ubicación')).toBeInTheDocument();
+    expect(screen.getByText('10.500000')).toBeInTheDocument();
+    expect(screen.getByText('-84.500000')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('NODO-014'), 'NODO-MAPA-01');
+    await user.type(screen.getByPlaceholderText('Subestación San Isidro'), 'Nodo desde mapa');
+    await user.click(screen.getByText('Crear nodo aquí'));
+
+    await waitFor(() => expect(networkNodeService.create).toHaveBeenCalledWith({
+      code: 'NODO-MAPA-01',
+      name: 'Nodo desde mapa',
+      location: null,
+      status: 'AVAILABLE',
+      latitude: 10.5,
+      longitude: -84.5,
+    }));
+    expect(onSaved).toHaveBeenCalledWith(createdNode);
+  });
 });

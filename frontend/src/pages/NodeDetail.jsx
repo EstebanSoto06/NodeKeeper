@@ -14,6 +14,7 @@ import { EmptyState } from '../components/EmptyState.jsx';
 import { ConfirmDialog } from '../components/ConfirmDialog.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { NodeFormModal } from '../components/NodeFormModal.jsx';
+import { EquipmentFormModal } from '../components/EquipmentFormModal.jsx';
 import { useAsync } from '../hooks/useAsync.js';
 import { usePermissions } from '../hooks/usePermissions.js';
 import * as networkNodeService from '../services/networkNodeService.js';
@@ -28,10 +29,11 @@ export function NodeDetail() {
   const { data, error, loading, reload } = useAsync(() => networkNodeService.getById(id), [id]);
   const node = data?.networkNode ?? null;
 
-  const { data: equipData, loading: equipLoading } = useAsync(() => equipmentService.list(), []);
+  const { data: equipData, loading: equipLoading, reload: reloadEquip } = useAsync(() => equipmentService.list(), []);
   const equip = (equipData?.equipment ?? []).filter((e) => e.networkNodeId === id);
 
   const [editing, setEditing] = useState(false);
+  const [creatingEquipment, setCreatingEquipment] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -92,7 +94,13 @@ export function NodeDetail() {
           </div>
         </div>
         <div className="nk-pagehead-actions">
-          <Button variant="secondary" icon="map-pin" onClick={() => navigate('/mapa')}>Ubicar</Button>
+          <Button variant="secondary" icon="map-pin" onClick={() => {
+            if (node.latitude != null && node.longitude != null) {
+              navigate(`/mapa?nodeId=${node.id}`);
+            } else {
+              showToast('Este nodo no tiene coordenadas registradas.', 'error');
+            }
+          }}>Ubicar</Button>
           {isAdmin && <Button variant="secondary" icon="pencil" onClick={() => setEditing(true)}>Editar</Button>}
           {isAdmin && <Button variant="danger" icon="trash-2" onClick={() => setConfirmingDelete(true)}>Eliminar</Button>}
         </div>
@@ -109,7 +117,13 @@ export function NodeDetail() {
       </Card>
 
       <Card pad={false}>
-        <div className="nk-card-head"><h3 className="nk-section-title">Equipos asociados</h3><span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{equip.length}</span></div>
+        <div className="nk-card-head">
+          <h3 className="nk-section-title">Equipos asociados</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{equip.length}</span>
+            {isAdmin && <Button variant="secondary" size="sm" icon="plus" onClick={() => setCreatingEquipment(true)}>Agregar equipo</Button>}
+          </div>
+        </div>
         {equipLoading ? (
           <div style={{ padding: 16 }}><LoadingSkeleton lines={2} /></div>
         ) : (
@@ -133,6 +147,17 @@ export function NodeDetail() {
       </Card>
 
       {editing && <NodeFormModal node={node} onClose={() => setEditing(false)} onSaved={reload} />}
+
+      {isAdmin && creatingEquipment && node && (
+        <EquipmentFormModal
+          defaultNodeId={node.id}
+          onClose={() => setCreatingEquipment(false)}
+          onSaved={() => {
+            setCreatingEquipment(false);
+            reloadEquip();
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmingDelete}
