@@ -25,7 +25,7 @@ npm test              # 245 pruebas
 
 ```bash
 cd frontend
-npm test               # 139 pruebas
+npm test               # 159 pruebas
 npm run test:coverage  # pruebas + reporte de cobertura
 ```
 

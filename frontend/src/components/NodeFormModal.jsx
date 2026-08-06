@@ -24,8 +24,12 @@ function fieldErrorsFrom(err) {
   return out;
 }
 
-export function NodeFormModal({ node, onClose, onSaved }) {
+export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
   const editing = !!node;
+  // Flujo de creacion desde el mapa (ver components/map/NodeMap.jsx +
+  // pages/Map.jsx): la latitud/longitud ya vienen fijadas por el click y se
+  // muestran de solo lectura, en vez de pedirselas de nuevo al usuario.
+  const fromMap = !editing && !!initialCoords;
   const [v, setV] = useState(node ? { ...EMPTY, ...node } : { ...EMPTY });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -52,13 +56,15 @@ export function NodeFormModal({ node, onClose, onSaved }) {
         name: v.name,
         location: v.location || null,
         status: v.status,
+        ...(fromMap ? { latitude: initialCoords.latitude, longitude: initialCoords.longitude } : {}),
       };
+      let result;
       if (editing) {
-        await networkNodeService.update(node.id, payload);
+        result = await networkNodeService.update(node.id, payload);
       } else {
-        await networkNodeService.create(payload);
+        result = await networkNodeService.create(payload);
       }
-      onSaved && onSaved();
+      onSaved && onSaved(result?.networkNode);
       onClose();
     } catch (err) {
       if (err.status === 400) {
@@ -75,14 +81,14 @@ export function NodeFormModal({ node, onClose, onSaved }) {
 
   return (
     <Modal
-      title={editing ? 'Editar nodo' : 'Crear nodo'}
-      subtitle={editing ? node.code : 'Registra un nodo de red'}
+      title={editing ? 'Editar nodo' : fromMap ? 'Crear nodo en esta ubicación' : 'Crear nodo'}
+      subtitle={editing ? node.code : fromMap ? `${initialCoords.latitude.toFixed(6)}, ${initialCoords.longitude.toFixed(6)}` : 'Registra un nodo de red'}
       icon="share-2" size="md" onClose={saving ? undefined : onClose}
       footer={(
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button variant="primary" icon="check" onClick={submit} disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar nodo'}
+            {saving ? 'Guardando…' : fromMap ? 'Crear nodo aquí' : 'Guardar nodo'}
           </Button>
         </>
       )}
@@ -90,6 +96,14 @@ export function NodeFormModal({ node, onClose, onSaved }) {
       {formError && (
         <div className="nk-callout" role="alert" style={{ marginBottom: 12 }}>
           <span>{formError}</span>
+        </div>
+      )}
+      {fromMap && (
+        <div className="nk-callout" style={{ marginBottom: 12 }}>
+          <span>
+            Latitud: <span className="nk-mono">{initialCoords.latitude.toFixed(6)}</span>{' · '}
+            Longitud: <span className="nk-mono">{initialCoords.longitude.toFixed(6)}</span>
+          </span>
         </div>
       )}
       <div className="nk-form-grid">
