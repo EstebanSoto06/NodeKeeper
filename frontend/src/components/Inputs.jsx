@@ -27,9 +27,14 @@ export function SearchInput({ value, onChange, placeholder = 'Buscar…', style 
   );
 }
 
-export function Select({ value, onChange, options }) {
+export function Select({ value, onChange, options, disabled, error }) {
   return (
-    <select className="nk-input nk-select" value={value} onChange={(e) => onChange && onChange(e.target.value)}>
+    <select
+      className={`nk-input nk-select ${error ? 'is-error' : ''}`}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange && onChange(e.target.value)}
+    >
       {options.map((o) => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
     </select>
   );

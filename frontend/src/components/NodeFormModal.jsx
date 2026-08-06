@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
+import { validateRequired } from '../utils/formValidation.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 
 const NODE_STATUS_OPTIONS = [
@@ -32,6 +33,16 @@ export function NodeFormModal({ node, onClose, onSaved }) {
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
 
   const submit = async () => {
+    const { isValid, fieldErrors: missingErrors, formError: missingError } = validateRequired([
+      { key: 'code', label: 'Código', value: v.code },
+      { key: 'name', label: 'Nombre', value: v.name },
+    ]);
+    if (!isValid) {
+      setFieldErrors(missingErrors);
+      setFormError(missingError);
+      return;
+    }
+
     setSaving(true);
     setFormError('');
     setFieldErrors({});

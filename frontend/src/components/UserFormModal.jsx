@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button, IconButton } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
+import { validateRequired } from '../utils/formValidation.js';
 import * as userService from '../services/userService.js';
 
 const ROLE_OPTIONS = [
@@ -39,6 +40,18 @@ export function UserFormModal({ user, isSelf, onClose, onSaved }) {
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
 
   const submit = async () => {
+    const { isValid, fieldErrors: missingErrors, formError: missingError } = validateRequired([
+      { key: 'name', label: 'Nombre completo', value: v.name },
+      { key: 'email', label: 'Correo institucional', value: v.email },
+      { key: 'role', label: 'Rol', value: v.role },
+      ...(!editing ? [{ key: 'password', label: 'Contraseña', value: v.password }] : []),
+    ]);
+    if (!isValid) {
+      setFieldErrors(missingErrors);
+      setFormError(missingError);
+      return;
+    }
+
     setSaving(true);
     setFormError('');
     setFieldErrors({});

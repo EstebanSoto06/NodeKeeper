@@ -8,6 +8,7 @@ import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { useAsync } from '../hooks/useAsync.js';
+import { validateRequired } from '../utils/formValidation.js';
 import * as equipmentService from '../services/equipmentService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as supportProviderService from '../services/supportProviderService.js';
@@ -74,6 +75,17 @@ export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved 
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
 
   const submit = async () => {
+    const { isValid, fieldErrors: missingErrors, formError: missingError } = validateRequired([
+      { key: 'name', label: 'Nombre del equipo', value: v.name },
+      { key: 'category', label: 'Categoría', value: v.category },
+      { key: 'networkNodeId', label: 'Nodo', value: v.networkNodeId },
+    ]);
+    if (!isValid) {
+      setFieldErrors(missingErrors);
+      setFormError(missingError);
+      return;
+    }
+
     setSaving(true);
     setFormError('');
     setFieldErrors({});
@@ -147,7 +159,7 @@ export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved 
             <TextInput value={v.serialNumber} onChange={set('serialNumber')} placeholder="Opcional" error={fieldErrors.serialNumber} />
           </Field>
           <Field label="Nodo" required error={fieldErrors.networkNodeId}>
-            <Select value={v.networkNodeId} onChange={set('networkNodeId')} options={nodeOptions} />
+            <Select value={v.networkNodeId} onChange={set('networkNodeId')} options={nodeOptions} error={fieldErrors.networkNodeId} />
           </Field>
           <Field label="Estado" error={fieldErrors.status}>
             <Select value={v.status} onChange={set('status')} options={EQUIPMENT_STATUS_OPTIONS} />
