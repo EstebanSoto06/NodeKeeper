@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Modal, DataList } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput } from './Inputs.jsx';
+import { validateRequired } from '../utils/formValidation.js';
 import * as supportProviderService from '../services/supportProviderService.js';
 
 const EMPTY = { companyName: '', supportPhone: '', supportEmail: '', contactName: '', contactPhone: '', contactEmail: '' };
@@ -28,6 +29,20 @@ export function ProviderFormModal({ provider, onClose, onSaved }) {
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
 
   const submit = async () => {
+    const { isValid, fieldErrors: missingErrors, formError: missingError } = validateRequired([
+      { key: 'companyName', label: 'Nombre de empresa', value: v.companyName },
+      { key: 'supportPhone', label: 'Número de soporte', value: v.supportPhone },
+      { key: 'supportEmail', label: 'Correo de soporte', value: v.supportEmail },
+      { key: 'contactName', label: 'Persona de contacto', value: v.contactName },
+      { key: 'contactPhone', label: 'Número de contacto', value: v.contactPhone },
+      { key: 'contactEmail', label: 'Correo de contacto', value: v.contactEmail },
+    ]);
+    if (!isValid) {
+      setFieldErrors(missingErrors);
+      setFormError(missingError);
+      return;
+    }
+
     setSaving(true);
     setFormError('');
     setFieldErrors({});

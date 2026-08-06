@@ -16,6 +16,16 @@ describe('NodeFormModal', () => {
     vi.clearAllMocks();
   });
 
+  it('sin codigo ni nombre: muestra el callout con los campos faltantes y no llama a create', async () => {
+    const user = userEvent.setup();
+    render(<NodeFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await user.click(screen.getByText('Guardar nodo'));
+
+    expect(screen.getByText('Faltan datos obligatorios: Código, Nombre.')).toBeInTheDocument();
+    expect(networkNodeService.create).not.toHaveBeenCalled();
+  });
+
   it('un codigo duplicado (409) se muestra como error en el campo Codigo', async () => {
     const user = userEvent.setup();
     networkNodeService.create.mockRejectedValueOnce(

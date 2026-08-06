@@ -38,6 +38,31 @@ describe('EquipmentFormModal', () => {
     expect(screen.getByText(fixtureProviderA.companyName)).toBeInTheDocument();
   });
 
+  it('sin nombre ni categoria: muestra el callout con los campos faltantes y no llama a create', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(screen.getByText('Guardar equipo'));
+
+    expect(screen.getByText('Faltan datos obligatorios: Nombre del equipo, Categoría.')).toBeInTheDocument();
+    expect(equipmentService.create).not.toHaveBeenCalled();
+  });
+
+  it('sin nodos disponibles para elegir: muestra tambien el error de Nodo', async () => {
+    const user = userEvent.setup();
+    networkNodeService.list.mockResolvedValueOnce({ networkNodes: [] });
+    supportProviderService.list.mockResolvedValueOnce({ supportProviders: [] });
+    render(<EquipmentFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
+    await waitFor(() => expect(screen.getByPlaceholderText('Switch core')).toBeInTheDocument());
+
+    await user.type(screen.getByPlaceholderText('Switch core'), 'Equipo sin nodo');
+    await user.type(screen.getByPlaceholderText('Red'), 'Red');
+    await user.click(screen.getByText('Guardar equipo'));
+
+    expect(screen.getByText('Faltan datos obligatorios: Nodo.')).toBeInTheDocument();
+    expect(equipmentService.create).not.toHaveBeenCalled();
+  });
+
   it('un numero de serie duplicado (409) se muestra como error en el campo correspondiente', async () => {
     const user = userEvent.setup();
     await renderReady();
