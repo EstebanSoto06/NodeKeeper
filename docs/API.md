@@ -90,22 +90,32 @@ Error:
 
 ## checklist-tasks — `/api/maintenances/:maintenanceId/checklist-tasks`
 
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| GET | `/` | ADMIN, OPERATOR | Listar tareas del mantenimiento |
-| POST | `/` | ADMIN | Crear tarea (solo mientras el mantenimiento está SCHEDULED) |
-| PUT | `/:taskId` | ADMIN | Editar descripción/orden de una tarea |
-| PATCH | `/:taskId/status` | ADMIN, OPERATOR | Marcar/desmarcar (`isCompleted` explícito en el payload) |
-| DELETE | `/:taskId` | ADMIN | Eliminar tarea |
+La autorización combina **rol** y **estado del mantenimiento**: ambos se validan en el backend, y un rol correcto en el estado equivocado se rechaza con `409`.
+
+| Método | Ruta | Rol | Estado requerido | Propósito |
+|---|---|---|---|---|
+| GET | `/` | ADMIN, OPERATOR | cualquiera | Listar tareas del mantenimiento |
+| POST | `/` | ADMIN | SCHEDULED | Crear tarea |
+| PUT | `/:taskId` | ADMIN | SCHEDULED | Editar descripción/orden de una tarea |
+| DELETE | `/:taskId` | ADMIN | SCHEDULED | Eliminar tarea |
+| PATCH | `/:taskId/status` | ADMIN, OPERATOR | IN_PROGRESS | Marcar/desmarcar (`isCompleted` explícito en el payload) |
+
+En resumen: la **estructura** del checklist (crear/editar/eliminar tareas) solo la gestiona un ADMIN mientras el mantenimiento está `SCHEDULED`; una vez iniciado queda congelada. **Marcar o desmarcar** tareas lo hacen ADMIN u OPERATOR, y solo mientras el mantenimiento está `IN_PROGRESS`.
 
 ## evidences — `/api/maintenances/:maintenanceId/evidences`
 
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| GET | `/` | ADMIN, OPERATOR | Listar evidencias (metadata) |
-| POST | `/` | ADMIN, OPERATOR | Subir archivo (`multipart/form-data`, campo `file`) |
-| GET | `/:evidenceId/file` | ADMIN, OPERATOR | Descargar/ver el archivo (responde binario + `Content-Disposition`) |
-| DELETE | `/:evidenceId` | ADMIN | Eliminar evidencia (archivo + metadata) |
+Igual que el checklist, la autorización combina **rol** y **estado del mantenimiento**.
+
+| Método | Ruta | Rol | Estado requerido | Propósito |
+|---|---|---|---|---|
+| GET | `/` | ADMIN, OPERATOR | cualquiera | Listar evidencias (metadata) |
+| GET | `/:evidenceId/file` | ADMIN, OPERATOR | cualquiera | Descargar/ver el archivo (responde binario + `Content-Disposition`) |
+| POST | `/` | ADMIN, OPERATOR | IN_PROGRESS | Subir archivo (`multipart/form-data`, campo `file`) |
+| DELETE | `/:evidenceId` | ADMIN | IN_PROGRESS | Eliminar evidencia (archivo + metadata) |
+
+Consultar y descargar evidencias funciona en cualquier estado, incluido `COMPLETED` (el historial permanece accesible). Subir y eliminar solo es posible mientras el mantenimiento está `IN_PROGRESS`: al cerrarlo, sus evidencias quedan de solo lectura.
+
+> **No implementado todavía:** no existe una API global de evidencias (`GET /api/evidences`). Las evidencias se consultan siempre dentro de su mantenimiento. Una galería global es una mejora funcional pendiente; ver [../README.md](../README.md#limitaciones-conocidas).
 
 ### Multipart y descargas
 

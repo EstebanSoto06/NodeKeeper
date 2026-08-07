@@ -17,7 +17,7 @@ El seguimiento de mantenimientos preventivos y correctivos de nodos, equipos y p
 ## Roles
 
 - **ADMIN**: gestiona usuarios, nodos, equipos, proveedores y mantenimientos; siempre debe existir al menos un ADMIN activo en el sistema (regla aplicada de forma atómica en el backend).
-- **OPERATOR**: consulta la información general y opera dentro del flujo de mantenimiento (iniciar, marcar checklist, adjuntar evidencias, crear correctivos), sin acceso a la administración de usuarios ni catálogos.
+- **OPERATOR**: consulta la información general y opera dentro del flujo de mantenimiento (iniciar, completar, marcar checklist, adjuntar y descargar evidencias), sin acceso al módulo de usuarios y sin poder crear, editar ni eliminar catálogos ni mantenimientos.
 
 ## Tecnologías
 
@@ -92,7 +92,7 @@ npm install
 npm run dev
 ```
 
-SPA disponible en `http://localhost:5173`.
+SPA disponible en `http://localhost:5173`. Ese es el puerto **predeterminado** de Vite: si está ocupado, Vite arranca en otro (5174, 5175…) e imprime la URL real en la consola. `FRONTEND_URL` en `backend/.env` debe coincidir exactamente con el origen que se esté usando, o el navegador bloqueará las llamadas por CORS. Durante las pruebas conviene mantener **una sola instancia** del frontend activa.
 
 ## Pruebas
 
@@ -126,6 +126,7 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 ## Limitaciones conocidas
 
 - Sin despliegue público todavía: este bloque prepara CI y documentación, no publica el sistema en internet (ver [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+- Sin galería global de evidencias: las evidencias se gestionan **dentro del detalle de cada mantenimiento** (subir, listar, descargar, eliminar). El backend almacena correctamente cada archivo y su metadata, pero la pantalla `/evidencias` es solo informativa y remite a Mantenimientos; no existe todavía una vista que agregue las evidencias de todos los mantenimientos, ni un endpoint global (`GET /api/evidences`). Es una mejora funcional pendiente, no una pérdida de datos.
 - Fuera del alcance del MVP: notificaciones por correo/SMS, integraciones externas, tiempo real con WebSockets (ver [docs/requirements/MVP_SCOPE.md](docs/requirements/MVP_SCOPE.md)).
 
 ## Documentación
@@ -143,7 +144,9 @@ JWT + bcrypt, autorización por rol validada en cada endpoint, validación de en
 
 ## Estado del proyecto
 
-MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa real con Leaflet/OpenStreetMap, reportes) y gestión de usuarios están implementados y probados (245 pruebas backend, 159 pruebas frontend). El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El despliegue público queda fuera de este alcance.
+MVP local funcional: autenticación, roles, catálogos, mantenimientos con checklist y evidencias, vistas operativas (dashboard, calendario, mapa real con Leaflet/OpenStreetMap, reportes) y gestión de usuarios están implementados y probados (245 pruebas backend, 159 pruebas frontend). Los formularios de creación/edición validan los campos obligatorios antes de llamar a la API, además de la validación real del backend. El historial de mantenimiento está protegido ante eliminación de nodos/equipos, y la API aplica rate limiting general y estricto en el login. El backup y la restauración se validaron localmente de punta a punta (ver [docs/RUNBOOK.md](docs/RUNBOOK.md)).
+
+Etapa actual: auditoría funcional, mejoras pendientes (entre ellas la galería global de evidencias), despliegue piloto **todavía no confirmado** y documentación académica.
 
 ## Autor
 

@@ -62,4 +62,14 @@ Procedimiento manual con `pg_dump`/`pg_restore`, **validado en local de punta a 
 
 ## Rollback (conceptual)
 
-Al no haber despliegue automatizado todavía, un rollback sería: desplegar la versión anterior del build/imagen del backend y del frontend, y — solo si la migración de base de datos de la versión nueva lo requiere y es reversible — aplicar la migración `down` correspondiente con Prisma. Las migraciones deben revisarse caso por caso antes de asumir que son reversibles sin pérdida de datos.
+Al no haber despliegue automatizado todavía, este procedimiento es conceptual.
+
+**El rollback de aplicación consiste en desplegar la versión anterior** del build del backend y del frontend. Eso cubre el caso en que el problema está en el código.
+
+**El rollback de base de datos es un problema distinto y no automático.** Prisma no genera migraciones `down` ni ofrece una reversión automática: `prisma migrate deploy` solo aplica migraciones hacia adelante. Si una migración modificó el esquema o los datos, debe existir un plan de recuperación revisado *antes* de desplegar, entre estas opciones:
+
+1. **Restauración desde backup** (ver [RUNBOOK.md](RUNBOOK.md#restore)), asumiendo la pérdida de los datos escritos después del backup.
+2. **Migración manual controlada** que revierta el cambio, escrita y probada explícitamente para ese caso.
+3. **Corrección hacia adelante**: una nueva migración que arregle el problema sin volver atrás.
+
+No debe asumirse que todas las migraciones son reversibles: una que elimina una columna o transforma datos destruye información que ninguna reversión de esquema puede recuperar por sí sola. Cada migración con impacto en datos debe revisarse caso por caso, y su plan de recuperación decidirse antes del despliegue, no durante el incidente.

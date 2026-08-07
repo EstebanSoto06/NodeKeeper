@@ -21,7 +21,8 @@ npm test              # 245 pruebas
 - Ubicación: `frontend/src/**/*.test.jsx` / `*.test.js`, junto al archivo que prueban.
 - Entorno `jsdom`; utilidades compartidas en `frontend/src/test/` (`setupTests.js`, `fixtures.js`, `test-utils.jsx`).
 - `renderWithProviders` envuelve cada prueba en `MemoryRouter` + un `AuthContext` controlado (sesión ADMIN, OPERATOR o invitado), sin red real: los servicios se mockean por módulo (`vi.mock('../services/xService.js', ...)`).
-- Cobertura funcional: cliente HTTP y sesión (`apiClient`, `AuthContext`, `ProtectedRoute`), hooks y componentes transversales (incluida la gestión de foco de `ConfirmDialog`: foco inicial en "Cancelar" para acciones destructivas, restauración de foco al cerrar), catálogos (incluidos los mensajes de bloqueo por historial de mantenimiento en Nodos/Equipos), mantenimientos/checklist/evidencias, usuarios, y vistas operativas (dashboard, calendario, mapa, reportes).
+- Cobertura funcional: cliente HTTP y sesión (`apiClient`, `AuthContext`, `ProtectedRoute`), hooks y componentes transversales (incluida la gestión de foco de `ConfirmDialog`: foco inicial en "Cancelar" para acciones destructivas, restauración de foco al cerrar), catálogos (incluidos los mensajes de bloqueo por historial de mantenimiento en Nodos/Equipos), mantenimientos/checklist/evidencias, usuarios, validación de campos obligatorios en los formularios de creación/edición (nodos, equipos, proveedores, usuarios y mantenimientos, incluido el filtrado de equipos por nodo en un correctivo), y vistas operativas (dashboard, calendario, mapa real con Leaflet, reportes).
+- El mapa se prueba con un mock controlado de `react-leaflet` (jsdom no provee las medidas reales del DOM que Leaflet necesita); `leaflet` en sí **no** se mockea, y las aserciones verifican las llamadas reales de encuadre y centrado (`setView`/`fitBounds`), no solo el DOM renderizado.
 
 ```bash
 cd frontend
