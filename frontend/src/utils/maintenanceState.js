@@ -34,6 +34,16 @@ export function canComplete(status) {
   return status === MAINTENANCE_STATES.IN_PROGRESS;
 }
 
+/** Reprogramar (mover scheduledDate) solo tiene sentido mientras la orden
+    sigue abierta: una COMPLETED ya se ejecuto y una CANCELLED no se va a
+    ejecutar, asi que cambiarles la fecha falsearia el historial. El backend
+    expone PUT /maintenances/:id sin restringir el estado, por lo que esta
+    regla es de la UI; la autorizacion por rol (solo ADMIN) SI la impone el
+    backend en la ruta. */
+export function canReschedule(status) {
+  return status === MAINTENANCE_STATES.SCHEDULED || status === MAINTENANCE_STATES.IN_PROGRESS;
+}
+
 /** Evidencias (subir/eliminar) solo son editables mientras esta en progreso. */
 export function canManageEvidence(status) {
   return status === MAINTENANCE_STATES.IN_PROGRESS;
