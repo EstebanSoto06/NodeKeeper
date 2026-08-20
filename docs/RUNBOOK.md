@@ -9,8 +9,10 @@ Procedimientos operativos de NodeKeeper: arranque, parada, migraciones, backups,
 docker compose -f docker-compose.local.yml up -d   # opcional
 
 cd backend && npm run dev     # http://localhost:4000
-cd frontend && npm run dev    # http://localhost:5173
+cd frontend && npm run dev    # http://localhost:5173 (puerto predeterminado)
 ```
+
+> Vite usa 5173 solo si está libre; si no, arranca en 5174 u otro e imprime la URL real. Verificar esa URL y que `FRONTEND_URL` en `backend/.env` coincida exactamente con ella, o las llamadas se bloquearán por CORS. Mantener **una sola instancia** del frontend activa durante las pruebas.
 
 ## Parada
 
@@ -60,7 +62,7 @@ DATABASE_URL="postgresql://usuario:clave@host:puerto/base_de_restauracion" ./res
 
 **Siempre contra una base de restauración separada**, nunca directamente sobre la base activa — permite validar el backup (conteos de filas, integridad) antes de promoverlo. Ver [restore.sh](../ops/backup-restore/restore.sh).
 
-**Validado en vivo de punta a punta** (F4 resuelto, permiso `CREATEDB` otorgado al rol `nodekeeper`): se creó `nodekeeper_restore_validation` (owner `nodekeeper`), se restauró el backup con `pg_restore --no-owner --no-acl`, y se comparó contra `nodekeeper_dev`:
+**Validado en vivo de punta a punta**: se creó `nodekeeper_restore_validation` (owner `nodekeeper`), se restauró el backup con `pg_restore --no-owner --no-acl`, y se comparó contra `nodekeeper_dev`:
 
 | Verificación | Resultado |
 |---|---|
@@ -71,7 +73,24 @@ DATABASE_URL="postgresql://usuario:clave@host:puerto/base_de_restauracion" ./res
 | `Maintenance_networkNodeId_fkey` / `Maintenance_equipmentId_fkey` | `ON DELETE RESTRICT` presente en la restaurada (`confdeltype = 'r'`) |
 | Smoke test (backend temporal apuntando a la restaurada) | `/api/health` 200, `/api/ready` 200, `X-Request-Id` presente, login ADMIN/OPERATOR OK, `/auth/me` OK, OPERATOR permitido en `/network-nodes` y rechazado (403) en `/users`, ADMIN permitido en `/users` |
 
-La base temporal se eliminó al finalizar (`DROP DATABASE`, con verificación literal del nombre antes de ejecutarlo).
+### Permiso `CREATEDB`: temporal, no permanente
+
+Crear la base aislada de restauración requiere que el rol tenga el atributo `CREATEDB` (o que un superusuario cree la base por él). **La aplicación NO necesita este permiso para funcionar**: NodeKeeper solo lee y escribe dentro de su propia base, y `prisma migrate deploy` tampoco crea bases. Es un permiso exclusivo del procedimiento de validación de restauración.
+
+Durante la validación se concedió temporalmente y **se revocó al terminar**:
+
+```sql
+-- Antes de la validación (con un superusuario local):
+ALTER ROLE nodekeeper WITH CREATEDB;
+
+-- Limpieza al finalizar la validación:
+DROP DATABASE nodekeeper_restore_validation;   -- verificar el nombre literal antes de ejecutar
+ALTER ROLE nodekeeper NOCREATEDB;              -- revocar el permiso temporal
+```
+
+La base temporal se eliminó al finalizar (`DROP DATABASE`, con verificación literal del nombre antes de ejecutarlo) y el rol quedó nuevamente sin `CREATEDB`. Si se repite el procedimiento, debe volver a concederse y revocarse de la misma forma, nunca dejarse activo de forma permanente.
+
+La alternativa preferible en un entorno gestionado, si no se desea conceder `CREATEDB` ni siquiera temporalmente, es que un superusuario cree la base de restauración una sola vez y ceda su propiedad al rol de la aplicación.
 
 > **Lección de esta sesión (invocación segura de las herramientas nativas):** al construir el comando manualmente, verifica siempre que la cadena de conexión quede exactamente donde el flag la espera (por ejemplo `--dbname=<conexión>` como un único valor). Combinar un flag de base de datos con la cadena de conexión pasada por separado hace que la herramienta rechace el comando y, en su mensaje de error, puede reimprimir la cadena completa — exponiendo la contraseña en la salida. Preferir siempre construir el argumento completo de una sola vez.
 
@@ -123,7 +142,7 @@ Ante un error de conexión, distinguir por el código:
 | `P1000: Authentication failed` | P1000 | El servidor respondió, pero rechazó usuario/contraseña | Verificar que la contraseña en `backend/.env` coincida con la configurada para ese rol en PostgreSQL (ver detalle abajo) |
 | `P1001: Can't reach database server` | P1001 | El servidor no es alcanzable (apagado, puerto o host equivocado) | Verificar que el servicio de PostgreSQL esté corriendo y el puerto en `DATABASE_URL` sea el correcto |
 | `password authentication failed for user "..."` (código Postgres `28P01`) | — (viene del log del backend, no de Prisma CLI) | El rol existe, pero la contraseña no coincide | Igual que P1000: alinear la contraseña, no recrear el rol |
-| `permission denied to create database` | — (SQL directo, no Prisma) | El rol no tiene el atributo `CREATEDB` ni es superusuario | `ALTER ROLE nodekeeper WITH CREATEDB;` con un superusuario local, o que ese superusuario cree la base necesaria una sola vez (ver "Restore" arriba) |
+| `permission denied to create database` | — (SQL directo, no Prisma) | El rol no tiene el atributo `CREATEDB` ni es superusuario. Solo aparece al crear la base aislada de restauración: la aplicación no necesita `CREATEDB` para operar | Conceder el permiso **temporalmente** con un superusuario local (`ALTER ROLE nodekeeper WITH CREATEDB;`) y revocarlo al terminar (`ALTER ROLE nodekeeper NOCREATEDB;`), o que ese superusuario cree la base necesaria una sola vez (ver "Restore" arriba) |
 
 **Nunca se debe**: modificar `backend/.env` de forma automática, imprimir la contraseña o la cadena `DATABASE_URL` completa en ningún log o reporte.
 

@@ -1,5 +1,9 @@
 ﻿# NodeKeeper - Estrategia de Pruebas
 
+> **Documento histórico de planificación inicial.** Describe la estrategia de pruebas tal como se planteó al comenzar el proyecto. Para el estado actual —suites realmente implementadas, conteos vigentes, comandos y umbrales de cobertura— consultar [../TESTING.md](../TESTING.md); ver también [../../README.md](../../README.md) y [../ARCHITECTURE.md](../ARCHITECTURE.md).
+>
+> Nota sobre el alcance real: la creación de mantenimientos (preventivos y correctivos) quedó finalmente restringida a ADMIN; las pruebas implementadas verifican ese permiso real, no la suposición original de este documento.
+
 ## Objetivo
 
 Validar que el MVP funcione correctamente, sin errores conocidos en los flujos principales, combinando pruebas automatizadas y pruebas funcionales documentadas.

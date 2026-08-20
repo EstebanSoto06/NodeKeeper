@@ -81,6 +81,11 @@ npm run dev
 
 SPA en `http://localhost:5173`, apuntando a `VITE_API_URL` (por defecto `http://localhost:4000/api`).
 
+> **Sobre el puerto:** 5173 es el puerto predeterminado de Vite, no una garantía. Si ya está ocupado (por ejemplo, por otra instancia del frontend que quedó corriendo), Vite arranca automáticamente en el siguiente libre —5174, 5175…— y muestra la URL real en la consola. Dos consecuencias prácticas:
+>
+> - `FRONTEND_URL` en `backend/.env` debe coincidir **exactamente** con el origen que el navegador está usando; si no, las respuestas se bloquean por CORS aunque la API funcione.
+> - Conviene trabajar con **una sola instancia** del frontend activa durante las pruebas: varias instancias en puertos distintos hacen que solo una coincida con `FRONTEND_URL` y el resto falle de forma confusa.
+
 ## Validación
 
 ```bash

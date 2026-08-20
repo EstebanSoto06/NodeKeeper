@@ -4,8 +4,14 @@
    (creador) como el campo real mas cercano, etiquetado explicitamente
    "Creado por" para no insinuar un dato que no existe. Exportacion CSV
    sin dependencias (escape manual) y vista imprimible via window.print()
-   + CSS @media print (sin generacion de PDF en servidor). */
-import { useMemo, useState } from 'react';
+   + CSS @media print (sin generacion de PDF en servidor).
+
+   La vista imprimible antepone un encabezado propio (.print-only) con la
+   fecha de generacion y los filtros aplicados, para que la hoja impresa o el
+   PDF se entiendan fuera de la pantalla. El formato de tabla (bordes,
+   encabezado repetido por pagina, filas sin partir) vive en el bloque
+   @media print de styles/global.css. */
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/Misc.jsx';
 import { Button } from '../components/Button.jsx';
@@ -83,6 +89,21 @@ function downloadCsv(csv) {
 
 const EMPTY_FILTERS = { from: '', to: '', status: 'all', type: 'all', nodeId: 'all', equipmentId: 'all' };
 
+const GENERATED_AT_FORMAT = new Intl.DateTimeFormat('es-CR', { dateStyle: 'long', timeStyle: 'short' });
+
+/* Describe en texto los filtros activos para el encabezado impreso: sin esto,
+   una hoja de papel no permite saber a que recorte de datos corresponde. */
+function describeFilters(filters, nodes, equipmentList) {
+  const parts = [];
+  if (filters.from) parts.push(`Desde ${filters.from}`);
+  if (filters.to) parts.push(`Hasta ${filters.to}`);
+  if (filters.status !== 'all') parts.push(`Estado: ${MAINTENANCE_STATUS[filters.status]?.label || filters.status}`);
+  if (filters.type !== 'all') parts.push(`Tipo: ${MAINTENANCE_TYPE[filters.type]?.label || filters.type}`);
+  if (filters.nodeId !== 'all') parts.push(`Nodo: ${nodes.find((n) => n.id === filters.nodeId)?.name || filters.nodeId}`);
+  if (filters.equipmentId !== 'all') parts.push(`Equipo: ${equipmentList.find((e) => e.id === filters.equipmentId)?.name || filters.equipmentId}`);
+  return parts;
+}
+
 export function Reports() {
   const navigate = useNavigate();
   const { data, error, loading, reload } = useAsync(() => maintenanceService.list(), []);
@@ -105,17 +126,49 @@ export function Reports() {
   ), [maintenances, filters]);
 
   const hasActiveFilters = Object.entries(filters).some(([k, v]) => v !== EMPTY_FILTERS[k]);
+  const activeFilterLabels = describeFilters(filters, nodes, equipmentList);
+
+  /* La fecha impresa debe ser la del momento de imprimir, no la del primer
+     render. Se fija al pulsar el boton y window.print() se dispara en el
+     efecto siguiente, ya con el encabezado actualizado en el DOM. */
+  const [generatedAt, setGeneratedAt] = useState(() => new Date());
+  const [printRequests, setPrintRequests] = useState(0);
+
+  useEffect(() => {
+    if (printRequests === 0) return;
+    window.print();
+  }, [printRequests]);
+
+  const handlePrint = () => {
+    setGeneratedAt(new Date());
+    setPrintRequests((n) => n + 1);
+  };
 
   return (
     <div>
-      <PageHeader eyebrow="Análisis" title="Reportes"
-        subtitle="Mantenimientos filtrados por fecha, estado, tipo, nodo y equipo."
-        actions={(
-          <div className="no-print" style={{ display: 'flex', gap: 8 }}>
-            <Button variant="secondary" icon="printer" onClick={() => window.print()}>Vista imprimible</Button>
-            <Button variant="primary" icon="download" onClick={() => downloadCsv(buildCsv(rows))} disabled={rows.length === 0}>Exportar CSV</Button>
-          </div>
-        )} />
+      <div className="no-print">
+        <PageHeader eyebrow="Análisis" title="Reportes"
+          subtitle="Mantenimientos filtrados por fecha, estado, tipo, nodo y equipo."
+          actions={(
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button variant="secondary" icon="printer" onClick={handlePrint}>Vista imprimible</Button>
+              <Button variant="primary" icon="download" onClick={() => downloadCsv(buildCsv(rows))} disabled={rows.length === 0}>Exportar CSV</Button>
+            </div>
+          )} />
+      </div>
+
+      {/* Encabezado exclusivo de la hoja impresa / del PDF. */}
+      <div className="print-only nk-print-head">
+        <h1>NodeKeeper · Reporte de mantenimientos</h1>
+        <p>
+          Generado el {GENERATED_AT_FORMAT.format(generatedAt)} · {rows.length} de {maintenances.length} registros
+        </p>
+        <p>
+          {activeFilterLabels.length > 0
+            ? `Filtros aplicados: ${activeFilterLabels.join(' · ')}`
+            : 'Sin filtros aplicados: se incluyen todos los mantenimientos registrados.'}
+        </p>
+      </div>
 
       <Card pad style={{ marginBottom: 16 }} className="no-print">
         <div className="nk-report-form">
@@ -144,7 +197,7 @@ export function Reports() {
 
       {!loading && !error && (
         <Card pad={false}>
-          <div className="nk-card-head">
+          <div className="nk-card-head no-print">
             <h3 className="nk-section-title">Resultados</h3>
             <span className="nk-mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>{rows.length} de {maintenances.length} registros</span>
           </div>

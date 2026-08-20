@@ -31,6 +31,19 @@ function fileFilter(req, file, cb) {
 const evidenceUpload = multer({
   storage,
   fileFilter,
+  // Los navegadores envian el filename del multipart codificado en UTF-8,
+  // pero multer lo decodifica como latin1 salvo que se le indique otra cosa
+  // (multer/index.js: `options.defParamCharset || 'latin1'`). Sin esta linea,
+  // subir "Diagrama sin titulo.png" con tildes guardaba
+  // "Diagrama sin tÃ­tulo.png" en Evidence.originalName, porque los bytes
+  // UTF-8 de cada acento se leian como dos caracteres latin1.
+  //
+  // Se corrige en el origen y no re-decodificando el string mas adelante
+  // (Buffer.from(name, "latin1").toString("utf8")): ese arreglo tardio
+  // corrompe los nombres que SI llegaron bien y hay que repetirlo en cada
+  // punto que lea originalname. Solo afecta al nombre declarado; el archivo
+  // fisico se guarda con un UUID (storedName) y nunca dependio de esto.
+  defParamCharset: "utf8",
   limits: {
     fileSize: env.maxFileSizeMb * 1024 * 1024,
     files: 1,

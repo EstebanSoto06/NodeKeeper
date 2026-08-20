@@ -88,10 +88,13 @@ Reglas:
 ## Fuera del MVP
 
 - Publicación en internet.
-- Docker.
+- Dockerización y despliegue contenerizado de la aplicación completa.
 - App móvil nativa.
 - Funcionamiento offline.
 - Notificaciones por correo, SMS o WhatsApp.
 - Integraciones con sistemas externos.
 - Reportes avanzados en PDF.
 - Tiempo real con WebSockets.
+- Galería global de evidencias (las evidencias se gestionan dentro de cada mantenimiento).
+
+> Sobre Docker: lo que queda fuera del MVP es **contenerizar y desplegar la aplicación completa**. El repositorio sí incluye un `docker-compose.local.yml` **opcional** que levanta únicamente PostgreSQL como herramienta de desarrollo; usarlo o instalar PostgreSQL directamente son alternativas igualmente válidas (ver [../LOCAL_SETUP.md](../LOCAL_SETUP.md)).

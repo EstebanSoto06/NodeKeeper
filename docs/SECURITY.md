@@ -34,9 +34,19 @@ La subida de evidencias (`POST /maintenances/:id/evidences`) usa Multer con:
 
 El tipo declarado por el cliente **no es de confianza**. Una vez el archivo está en disco, `detectRealFileType` (librería `file-type`) inspecciona la firma binaria real y solo entonces se acepta definitivamente el archivo, con una extensión física controlada por ese tipo real detectado — nunca por la extensión que haya enviado el cliente. Un ejecutable renombrado como `.jpg`, por ejemplo, es rechazado en esta segunda verificación aunque haya superado el filtro de `Content-Type` declarado.
 
-## Cuarentena
+## Rechazo en la subida y cuarentena en la eliminación
 
-Si el archivo pasa la subida pero falla la verificación de contenido real (u otro paso posterior falla), se mueve a un directorio de cuarentena (`backend/uploads/evidences/.quarantine`) mediante una operación atómica de sistema de archivos (`rename`), en vez de eliminarse directamente o quedar mezclado con evidencias válidas. Existen rutinas simétricas para restaurar o eliminar definitivamente un archivo en cuarentena, usadas por la lógica de compensación si una operación posterior falla.
+Son dos mecanismos distintos; conviene no confundirlos.
+
+**Subida rechazada (eliminación directa).** Si el archivo ya escrito en disco falla la verificación de contenido real —el tipo detectado no está permitido, o no coincide con el `Content-Type` declarado— el archivo temporal se **elimina** (`deleteEvidenceFileIfExists`) y la API responde `400`. No pasa por cuarentena: un archivo rechazado en la subida nunca llegó a ser una evidencia registrada, así que no hay nada que compensar ni restaurar.
+
+**Cuarentena (eliminación de una evidencia ya registrada).** El directorio de cuarentena (`backend/uploads/evidences/.quarantine`) se usa al **eliminar** una evidencia existente o un mantenimiento completo, donde sí hay que coordinar dos sistemas que no comparten transacción (PostgreSQL y el sistema de archivos):
+
+1. El archivo se mueve a cuarentena con `rename` (operación atómica dentro de la misma unidad de almacenamiento), antes de tocar la base de datos.
+2. Si la eliminación en PostgreSQL falla, el archivo se **restaura** desde cuarentena a su ubicación original: la evidencia sigue existiendo, completa y consistente.
+3. Si la eliminación en PostgreSQL tiene éxito, el archivo se **purga** definitivamente de cuarentena.
+
+Esto evita los dos estados inconsistentes posibles: una fila borrada con su archivo aún en disco, o un archivo borrado con su fila todavía presente. La cuarentena es un paso intermedio de compensación, no un depósito permanente de archivos sospechosos.
 
 ## Rate limiting
 

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Prototipo visual de NodeKeeper para Coopelesca — React + Vite + Tailwind sobre el Design System NodeKeeper.",
+  "description": "Frontend web de NodeKeeper para la gestión de nodos, equipos y mantenimientos de Coopelesca.",
   "engines": {
     "node": ">=24 <25"
   },

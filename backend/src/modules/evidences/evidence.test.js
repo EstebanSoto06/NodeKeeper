@@ -340,6 +340,44 @@ describe("Evidence routes", () => {
       expect(evidence.uploadedBy.email).toBe(ADMIN_EMAIL);
     });
 
+    it("preserves non-ASCII characters in originalName (UTF-8, not latin1)", async () => {
+      // Multer decodifica el filename del multipart como latin1 por defecto:
+      // sin defParamCharset "utf8" (ver upload.middleware.js), este nombre se
+      // guardaba como "Diagrama sin tÃ­tulo-PÃ¡gina-1.png". Los nombres de
+      // archivo en espanol llevan tildes y enes de forma habitual.
+      const maintenanceId = await createInProgressMaintenance();
+      const filename = "Diagrama sin título-Página-1-año-mañana.png";
+
+      const response = await uploadEvidenceReq(
+        maintenanceId,
+        adminToken,
+        getMinimalPngBuffer(),
+        filename,
+        "image/png",
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.evidence.originalName).toBe(filename);
+      expect(response.body.data.evidence.originalName).not.toContain("Ã");
+
+      // Tambien debe quedar correcto en la base, no solo en la respuesta.
+      const stored = await prisma.evidence.findUnique({
+        where: { id: response.body.data.evidence.id },
+        select: { originalName: true },
+      });
+      expect(stored.originalName).toBe(filename);
+
+      // Y viajar intacto en el Content-Disposition de la descarga.
+      const download = await request(app)
+        .get(`${evidencesUrl(maintenanceId)}/${response.body.data.evidence.id}/file`)
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(download.status).toBe(200);
+      expect(download.headers["content-disposition"]).toContain(
+        encodeURIComponent(filename),
+      );
+    });
+
     it("never exposes storedName or relativePath in the JSON response", async () => {
       const maintenanceId = await createInProgressMaintenance();
       const response = await uploadValidJpeg(maintenanceId);

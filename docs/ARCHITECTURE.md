@@ -43,8 +43,8 @@ JWT firmado con `JWT_SECRET`, emitido en `POST /auth/login` tras verificar la co
 
 `authorizeRoles(...roles)` protege cada ruta explícitamente (ver matriz completa en [API.md](API.md)). Resumen:
 
-- **ADMIN**: acceso completo a catálogos (nodos, equipos, proveedores), usuarios, y creación/edición/eliminación de mantenimientos y checklist.
-- **OPERATOR**: solo lectura en catálogos y usuarios (sin acceso a usuarios); dentro del flujo de mantenimiento puede iniciar, completar, marcar checklist y gestionar evidencias.
+- **ADMIN**: acceso completo a catálogos (nodos, equipos, proveedores), usuarios, y creación/edición/eliminación de mantenimientos y de la estructura del checklist.
+- **OPERATOR**: solo lectura en catálogos, sin acceso al módulo de usuarios. No crea, edita ni elimina mantenimientos (`POST/PUT/DELETE /maintenances` son solo ADMIN); dentro del flujo de un mantenimiento existente puede iniciarlo, completarlo, marcar/desmarcar tareas del checklist y subir/descargar evidencias, según el estado del mantenimiento.
 
 ## Módulos
 
@@ -62,7 +62,7 @@ Tareas (`ChecklistTask`) con `isCompleted`, `completedAt`, `completedById`. `PAT
 
 ## Evidences
 
-Carga vía `multipart/form-data` (Multer) con doble validación: el tipo declarado por el cliente se filtra en el middleware de subida, y una vez el archivo está en disco se detecta su tipo **real** por contenido (firma binaria, no extensión) antes de aceptarlo definitivamente. El nombre físico almacenado es aleatorio (no deriva del nombre original). Ver [SECURITY.md](SECURITY.md) para el detalle de cuarentena y `Content-Disposition` seguro.
+Carga vía `multipart/form-data` (Multer) con doble validación: el tipo declarado por el cliente se filtra en el middleware de subida, y una vez el archivo está en disco se detecta su tipo **real** por contenido (firma binaria, no extensión) antes de aceptarlo definitivamente. El nombre físico almacenado es aleatorio (no deriva del nombre original). Un archivo que falla esa segunda verificación se elimina y la subida se rechaza con `400`; la cuarentena es un mecanismo distinto, usado al **eliminar** una evidencia ya registrada para poder revertir si falla la escritura en base de datos. Ver [SECURITY.md](SECURITY.md) para el detalle de ambos casos y del `Content-Disposition` seguro.
 
 ## Transacciones Serializable
 

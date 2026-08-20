@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Reports } from './Reports.jsx';
 import { renderWithProviders, adminAuthValue } from '../test/test-utils.jsx';
@@ -101,5 +101,41 @@ describe('Reports', () => {
 
     await waitFor(() => expect(screen.getByText('0 de 2 registros')).toBeInTheDocument());
     expect(screen.getByText('Exportar CSV').closest('button')).toBeDisabled();
+  });
+
+  /* ---------- Encabezado de la hoja impresa / del PDF ---------- */
+
+  it('la hoja impresa lleva titulo propio y el conteo de registros', async () => {
+    await renderReady();
+
+    expect(screen.getByText('NodeKeeper · Reporte de mantenimientos')).toBeInTheDocument();
+    expect(screen.getByText(/Generado el .* · 2 de 2 registros/)).toBeInTheDocument();
+  });
+
+  it('sin filtros, la hoja lo indica explicitamente', async () => {
+    await renderReady();
+
+    expect(screen.getByText('Sin filtros aplicados: se incluyen todos los mantenimientos registrados.')).toBeInTheDocument();
+  });
+
+  it('con filtros activos, la hoja los describe para que el papel se entienda solo', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'COMPLETED');
+    await user.selectOptions(screen.getByLabelText('Tipo'), 'PREVENTIVE');
+
+    expect(screen.getByText('Filtros aplicados: Estado: Completado · Tipo: Preventivo')).toBeInTheDocument();
+    // El conteo del encabezado sigue al filtro.
+    expect(screen.getByText(/Generado el .* · 1 de 2 registros/)).toBeInTheDocument();
+  });
+
+  it('la tabla conserva un thead propio (base de la repeticion por pagina en @media print)', async () => {
+    await renderReady();
+
+    const thead = screen.getByRole('table').querySelector('thead');
+    expect(thead).toBeInTheDocument();
+    expect(within(thead).getByText('Mantenimiento')).toBeInTheDocument();
+    expect(within(thead).getByText('Estado')).toBeInTheDocument();
   });
 });

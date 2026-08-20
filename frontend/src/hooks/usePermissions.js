@@ -19,6 +19,7 @@ import {
   canManageEvidence,
   canManageChecklist,
   canManageChecklistStructure,
+  canReschedule,
 } from '../utils/maintenanceState.js';
 
 export function usePermissions() {
@@ -62,6 +63,12 @@ export function usePermissions() {
       },
       canDeleteEvidenceFor(status) {
         return isAdmin && canManageEvidence(status);
+      },
+      /* Reprogramar (arrastrar en el calendario): solo ADMIN -- PUT
+         /maintenances/:id esta autorizado unicamente para ese rol -- y solo
+         si la orden sigue abierta (ni COMPLETED ni CANCELLED). */
+      canRescheduleMaintenanceFor(status) {
+        return isAdmin && canReschedule(status);
       },
       /* Estructura del checklist (crear/editar/eliminar tareas): solo ADMIN,
          solo con el mantenimiento SCHEDULED. */
