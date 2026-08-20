@@ -136,20 +136,52 @@ export async function createMaintenance(data, userId) {
   }
 }
 
+// Estados en los que una orden sigue abierta y, por tanto, editable. Una
+// COMPLETED ya se ejecuto y una CANCELLED no se va a ejecutar: cambiarles la
+// fecha, el nodo, el equipo o el titulo falsearia el historial de
+// mantenimiento que el resto del sistema preserva a proposito (ver las
+// relaciones onDelete: Restrict en schema.prisma).
+const UPDATABLE_STATUSES = ["SCHEDULED", "IN_PROGRESS"];
+
+const CLOSED_MAINTENANCE_ERROR =
+  "Only scheduled or in-progress maintenances can be updated";
+
 export async function updateMaintenance(id, data) {
-  await getMaintenanceById(id);
+  // El estado se toma de la base de datos, nunca del cuerpo de la solicitud:
+  // maintenanceSchema ni siquiera acepta `status`, asi que un cliente no
+  // puede influir en esta decision. Esta lectura ademas distingue el 404
+  // (no existe) del 409 (existe pero esta cerrada).
+  const current = await getMaintenanceById(id);
+
+  if (!UPDATABLE_STATUSES.includes(current.status)) {
+    throw createHttpError(409, CLOSED_MAINTENANCE_ERROR);
+  }
 
   const preparedData = await prepareMaintenanceData(data);
 
+  let result;
+
   try {
-    return await prisma.maintenance.update({
-      where: { id },
+    // El UPDATE se condiciona por id + status (mismo patron que
+    // startMaintenance/completeMaintenance) y no solo por id: entre la
+    // lectura de arriba y esta escritura, un POST /complete concurrente pudo
+    // cerrar la orden. Con el status dentro del WHERE, esa carrera no puede
+    // colar una edicion sobre una orden ya cerrada -- PostgreSQL bloquea la
+    // fila y la condicion deja de cumplirse.
+    result = await prisma.maintenance.updateMany({
+      where: { id, status: { in: UPDATABLE_STATUSES } },
       data: preparedData,
-      include: maintenanceInclude,
     });
   } catch (error) {
     return rethrowAsNotFoundOnForeignKeyViolation(error);
   }
+
+  if (result.count === 0) {
+    // Ninguna fila cambio: la orden se cerro entre la lectura y la escritura.
+    throw createHttpError(409, CLOSED_MAINTENANCE_ERROR);
+  }
+
+  return getMaintenanceById(id);
 }
 
 async function restoreQuarantinedEvidences(storedNames) {

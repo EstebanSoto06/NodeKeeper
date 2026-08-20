@@ -559,4 +559,186 @@ describe("Maintenance routes", () => {
     expect(response.body.data.maintenance.equipmentId).toBe(equipmentId);
     expect(response.body.data.maintenance.networkNodeId).toBeNull();
   });
+
+  /* ---------- Ordenes cerradas: PUT bloqueado en la capa de servicio ----------
+     El caso SCHEDULED ya lo cubre "updates a maintenance as ADMIN" mas
+     arriba (una orden recien creada nace SCHEDULED), por lo que aqui solo se
+     agregan los casos que faltaban: IN_PROGRESS, COMPLETED y CANCELLED. */
+
+  const CLOSED_UPDATE_MESSAGE =
+    "Only scheduled or in-progress maintenances can be updated";
+
+  // Lleva una orden hasta COMPLETED por el flujo real de la API
+  // (checklist completa -> start -> complete), no escribiendo el estado a mano.
+  async function createCompletedMaintenance() {
+    const createResponse = await createPreventiveMaintenance();
+    const maintenanceId = createResponse.body.data.maintenance.id;
+
+    await prisma.checklistTask.create({
+      data: {
+        maintenanceId,
+        description: "Tarea completada",
+        isCompleted: true,
+        completedAt: new Date(),
+        sortOrder: 1,
+      },
+    });
+
+    await request(app)
+      .post(`/api/maintenances/${maintenanceId}/start`)
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    await request(app)
+      .post(`/api/maintenances/${maintenanceId}/complete`)
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    return maintenanceId;
+  }
+
+  // CANCELLED existe en el enum pero no tiene endpoint de transicion (ver
+  // maintenance.routes.js), asi que la unica forma de producir ese estado
+  // real es escribirlo directamente en la base de datos.
+  async function createCancelledMaintenance() {
+    const createResponse = await createPreventiveMaintenance();
+    const maintenanceId = createResponse.body.data.maintenance.id;
+
+    await prisma.maintenance.update({
+      where: { id: maintenanceId },
+      data: { status: "CANCELLED" },
+    });
+
+    return maintenanceId;
+  }
+
+  function readMaintenance(maintenanceId) {
+    return request(app)
+      .get(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+  }
+
+  it("updates an IN_PROGRESS maintenance as ADMIN", async () => {
+    const createResponse = await createPreventiveMaintenance();
+    const maintenanceId = createResponse.body.data.maintenance.id;
+
+    await request(app)
+      .post(`/api/maintenances/${maintenanceId}/start`)
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    const response = await request(app)
+      .put(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Mantenimiento QA En Progreso Editado",
+        type: "PREVENTIVE",
+        networkNodeId,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.maintenance.title).toBe(
+      "Mantenimiento QA En Progreso Editado",
+    );
+    // Editar no altera el estado ni la trazabilidad del inicio.
+    expect(response.body.data.maintenance.status).toBe("IN_PROGRESS");
+    expect(response.body.data.maintenance.startedAt).not.toBeNull();
+  });
+
+  it("rejects updating a COMPLETED maintenance with 409 and leaves it unchanged", async () => {
+    const maintenanceId = await createCompletedMaintenance();
+    const before = await readMaintenance(maintenanceId);
+
+    const response = await request(app)
+      .put(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Intento De Edicion Sobre Orden Cerrada",
+        description: "No debe persistir",
+        type: "PREVENTIVE",
+        networkNodeId,
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toBe(CLOSED_UPDATE_MESSAGE);
+
+    const after = await readMaintenance(maintenanceId);
+    expect(after.body.data.maintenance.title).toBe(
+      before.body.data.maintenance.title,
+    );
+    expect(after.body.data.maintenance.description).toBe(
+      before.body.data.maintenance.description,
+    );
+    expect(after.body.data.maintenance.status).toBe("COMPLETED");
+    expect(after.body.data.maintenance.completedAt).not.toBeNull();
+  });
+
+  it("rejects updating a CANCELLED maintenance with 409 and leaves it unchanged", async () => {
+    const maintenanceId = await createCancelledMaintenance();
+    const before = await readMaintenance(maintenanceId);
+
+    const response = await request(app)
+      .put(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Intento De Edicion Sobre Orden Cancelada",
+        type: "PREVENTIVE",
+        networkNodeId,
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toBe(CLOSED_UPDATE_MESSAGE);
+
+    const after = await readMaintenance(maintenanceId);
+    expect(after.body.data.maintenance.title).toBe(
+      before.body.data.maintenance.title,
+    );
+    expect(after.body.data.maintenance.status).toBe("CANCELLED");
+  });
+
+  it("blocks the update of a closed maintenance even for ADMIN, the only role authorized to update", async () => {
+    const maintenanceId = await createCompletedMaintenance();
+    const body = {
+      title: "Edicion No Permitida",
+      type: "PREVENTIVE",
+      networkNodeId,
+    };
+
+    const operatorResponse = await request(app)
+      .put(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${operatorToken}`)
+      .send(body);
+
+    const adminResponse = await request(app)
+      .put(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send(body);
+
+    // OPERATOR ni siquiera pasa la autorizacion de la ruta; ADMIN si la pasa
+    // y aun asi la regla de estado lo detiene en la capa de servicio.
+    expect(operatorResponse.status).toBe(403);
+    expect(adminResponse.status).toBe(409);
+    expect(adminResponse.body.message).toBe(CLOSED_UPDATE_MESSAGE);
+  });
+
+  it("keeps a closed maintenance intact when the update body is otherwise valid and changes the type", async () => {
+    // Cambiar de tipo es la edicion mas destructiva (reasigna nodo/equipo):
+    // debe quedar bloqueada igual sobre una orden cerrada.
+    const maintenanceId = await createCompletedMaintenance();
+
+    const response = await request(app)
+      .put(`/api/maintenances/${maintenanceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Conversion No Permitida",
+        type: "CORRECTIVE",
+        equipmentId,
+      });
+
+    expect(response.status).toBe(409);
+
+    const after = await readMaintenance(maintenanceId);
+    expect(after.body.data.maintenance.type).toBe("PREVENTIVE");
+    expect(after.body.data.maintenance.networkNodeId).toBe(networkNodeId);
+    expect(after.body.data.maintenance.equipmentId).toBeNull();
+  });
 });
