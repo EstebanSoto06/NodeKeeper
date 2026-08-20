@@ -19,20 +19,10 @@ import { ErrorState } from './ErrorState.jsx';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { useAsync } from '../hooks/useAsync.js';
+import { formatSize, iconForMimeType, isImageMimeType } from '../utils/evidenceFormat.js';
 import * as evidenceService from '../services/evidenceService.js';
 
 const ACCEPT = '.jpg,.jpeg,.png,.pdf,.docx,image/jpeg,image/png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function iconFor(mimeType) {
-  if (mimeType === 'image/jpeg' || mimeType === 'image/png') return 'image';
-  return 'file-text';
-}
 
 // Dispara la descarga de un blob ya obtenido, sin exponer una URL publica
 // permanente: se crea un object URL, se usa una unica vez y se libera.
@@ -146,8 +136,8 @@ export function EvidencePanel({ maintenanceId, status, isCompleted }) {
           )}
           {evidences.map((v) => (
             <div key={v.id} className="nk-evid">
-              <div className="nk-evid-thumb" style={{ background: v.mimeType.startsWith('image/') ? 'var(--blue-50)' : 'var(--gray-100)' }}>
-                <Icon name={iconFor(v.mimeType)} size={22} style={{ color: v.mimeType.startsWith('image/') ? 'var(--blue-600)' : 'var(--gray-500)' }} />
+              <div className="nk-evid-thumb" style={{ background: isImageMimeType(v.mimeType) ? 'var(--blue-50)' : 'var(--gray-100)' }}>
+                <Icon name={iconForMimeType(v.mimeType)} size={22} style={{ color: isImageMimeType(v.mimeType) ? 'var(--blue-600)' : 'var(--gray-500)' }} />
               </div>
               <div className="nk-evid-meta">
                 <span className="nk-evid-name">{v.originalName}</span>

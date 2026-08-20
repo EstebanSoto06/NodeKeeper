@@ -6,9 +6,11 @@
    /usuarios es ADMIN-only: OPERATOR (o navegacion directa por URL) ve
    AccessDenied gracias a la guarda de rol, y el Sidebar ya oculta el enlace
    para ese rol.
-   /evidencias no expone una galeria global (el backend no tiene ese
-   endpoint): muestra una pantalla informativa que enlaza a Mantenimientos
-   (donde viven las evidencias reales, dentro de cada orden). */
+   /evidencias consolida en una tabla las evidencias reales de todas las
+   ordenes: el backend no tiene un endpoint de galeria global, pero
+   GET /maintenances ya incluye la metadata de cada evidencia y la descarga
+   usa el endpoint real por evidencia. Subir/eliminar sigue estando dentro de
+   cada orden (ver pages/EvidencesInfo.jsx). */
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell.jsx';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
