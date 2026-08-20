@@ -1,8 +1,14 @@
 /* Listado de mantenimientos, conectado a GET/POST/PUT/DELETE /maintenances.
    Solo ADMIN crea/edita/elimina (autorizado asi en el backend); ADMIN y
-   OPERATOR consultan, inician y completan. */
+   OPERATOR consultan, inician y completan.
+
+   El boton global "Nuevo" del Topbar navega aqui con
+   state.maintenancesRefreshedAt tras crear una orden. Ese sello de tiempo es
+   una dependencia de la carga para que la lista se refresque tambien cuando
+   el usuario YA estaba en /mantenimientos (navegar a la ruta actual no
+   remonta el componente y, sin esto, la orden recien creada no aparecia). */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/Misc.jsx';
 import { Button, IconButton } from '../components/Button.jsx';
 import { Card, ProgressBar } from '../components/Card.jsx';
@@ -45,8 +51,10 @@ function subjectOf(m) {
 
 export function Maintenances() {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const refreshedAt = state?.maintenancesRefreshedAt ?? null;
   const { isAdmin } = usePermissions();
-  const { data, error, loading, reload } = useAsync(() => maintenanceService.list(), []);
+  const { data, error, loading, reload } = useAsync(() => maintenanceService.list(), [refreshedAt]);
   const maintenances = data?.maintenances ?? [];
 
   const [q, setQ] = useState('');
