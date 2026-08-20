@@ -19,7 +19,14 @@
    scheduledDate es opcional en su schema y el chequeo de red/equipo
    (prepareMaintenanceData) lanza un 400 plano sin errors[] -- sin esta
    validacion previa, un select o fecha vacios solo mostraban un mensaje
-   generico en ingles, nunca marcados en el campo. Ver utils/formValidation.js. */
+   generico en ingles, nunca marcados en el campo. Ver utils/formValidation.js.
+
+   PROGRAMACION RECURRENTE (solo al crear): el backend no tiene campo de
+   recurrencia, asi que la opcion "serie recurrente" NO crea una entidad
+   nueva: calcula N fechas (utils/recurrence.js) y hace N POST /maintenances
+   normales, produciendo N ordenes INDEPENDIENTES. La UI lo dice de forma
+   explicita. Las creaciones son secuenciales para poder informar con
+   exactitud cuantas se alcanzaron a crear si una falla a mitad de camino. */
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button } from './Button.jsx';
@@ -27,6 +34,14 @@ import { Field, TextInput, Select } from './Inputs.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { useAsync } from '../hooks/useAsync.js';
 import { validateRequired } from '../utils/formValidation.js';
+import {
+  RECURRENCE_OPTIONS,
+  MAX_RECURRENCE_COUNT,
+  MIN_RECURRENCE_COUNT,
+  buildRecurrenceDates,
+  buildSeriesTitle,
+} from '../utils/recurrence.js';
+import { showToast } from '../store/store.js';
 import * as maintenanceService from '../services/maintenanceService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as equipmentService from '../services/equipmentService.js';
@@ -35,6 +50,39 @@ const TYPE_OPTIONS = [
   { value: 'PREVENTIVE', label: 'Preventivo' },
   { value: 'CORRECTIVE', label: 'Correctivo' },
 ];
+
+const COUNT_OPTIONS = Array.from(
+  { length: MAX_RECURRENCE_COUNT - MIN_RECURRENCE_COUNT + 1 },
+  (_, i) => {
+    const n = MIN_RECURRENCE_COUNT + i;
+    return { value: String(n), label: `${n} órdenes` };
+  },
+);
+
+/* Crea la serie orden por orden. Devuelve cuantas se crearon y el error que
+   detuvo el proceso (si lo hubo), en vez de lanzar: las ordenes ya creadas
+   son reales y persisten en el backend, asi que el llamador debe poder
+   informarlas aunque la serie no se complete. */
+async function createSeries(basePayload, dates, onProgress) {
+  let created = 0;
+
+  for (let i = 0; i < dates.length; i += 1) {
+    onProgress(i);
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await maintenanceService.create({
+        ...basePayload,
+        title: buildSeriesTitle(basePayload.title, i, dates.length),
+        scheduledDate: dates[i],
+      });
+      created += 1;
+    } catch (error) {
+      return { created, error };
+    }
+  }
+
+  return { created, error: null };
+}
 
 function emptyForm() {
   return { title: '', description: '', type: 'PREVENTIVE', scheduledDate: '', networkNodeId: '', equipmentId: '' };
@@ -86,6 +134,15 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
 
+  // Serie recurrente: solo disponible al crear (editar afecta a UNA orden).
+  const [isSeries, setIsSeries] = useState(false);
+  const [frequency, setFrequency] = useState(RECURRENCE_OPTIONS[0].value);
+  const [seriesCount, setSeriesCount] = useState(String(MIN_RECURRENCE_COUNT + 1));
+  const [seriesProgress, setSeriesProgress] = useState(0);
+
+  const seriesEnabled = !editing && isSeries;
+  const seriesDates = seriesEnabled ? buildRecurrenceDates(v.scheduledDate, frequency, Number(seriesCount)) : [];
+
   // Respaldo de la derivacion de networkNodeId en edicion correctiva: solo
   // actua si maintenance.equipment no vino incluido (no deberia pasar dado
   // el include real del backend, pero se cubre por robustez).
@@ -118,9 +175,16 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
       return;
     }
 
+    if (seriesEnabled && seriesDates.length === 0) {
+      setFieldErrors({ scheduledDate: 'Fecha no válida para calcular la serie.' });
+      setFormError('No se pudieron calcular las fechas de la serie.');
+      return;
+    }
+
     setSaving(true);
     setFormError('');
     setFieldErrors({});
+    setSeriesProgress(0);
     try {
       const payload = {
         title: v.title,
@@ -132,6 +196,20 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
       };
       if (editing) {
         await maintenanceService.update(maintenance.id, payload);
+      } else if (seriesEnabled) {
+        const { created, error } = await createSeries(payload, seriesDates, setSeriesProgress);
+        if (error) {
+          // Las ordenes ya creadas son reales: se recarga la vista para que se
+          // vean, y el modal permanece abierto con el detalle de lo ocurrido.
+          if (created > 0) onSaved && onSaved();
+          setFormError(
+            created === 0
+              ? (error.message || 'No se pudo crear la serie de mantenimientos.')
+              : `Se crearon ${created} de ${seriesDates.length} órdenes y se conservan. La orden ${created + 1} falló: ${error.message || 'error desconocido'}.`,
+          );
+          return;
+        }
+        showToast(`Se crearon ${created} órdenes de mantenimiento independientes.`);
       } else {
         await maintenanceService.create(payload);
       }
@@ -160,7 +238,9 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button variant="primary" icon="check" onClick={submit} disabled={saving || optionsLoading}>
-            {saving ? 'Guardando…' : 'Guardar mantenimiento'}
+            {saving && seriesEnabled
+              ? `Creando ${Math.min(seriesProgress + 1, seriesDates.length)} de ${seriesDates.length}…`
+              : saving ? 'Guardando…' : seriesEnabled ? `Crear ${seriesDates.length || seriesCount} órdenes` : 'Guardar mantenimiento'}
           </Button>
         </>
       )}
@@ -221,6 +301,51 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
               <TextInput value={v.description} onChange={set('description')} placeholder="Opcional" error={fieldErrors.description} />
             </Field>
           </div>
+
+          {!editing && (
+            <div className="nk-col-2 nk-series">
+              <label className="nk-check-inline">
+                <input
+                  type="checkbox"
+                  checked={isSeries}
+                  disabled={saving}
+                  onChange={(e) => setIsSeries(e.target.checked)}
+                />
+                Programar como serie recurrente
+              </label>
+
+              {isSeries && (
+                <div className="nk-series-body">
+                  <div className="nk-form-grid">
+                    <Field label="Frecuencia">
+                      <Select value={frequency} onChange={setFrequency} options={RECURRENCE_OPTIONS} />
+                    </Field>
+                    <Field label="Cantidad">
+                      <Select value={seriesCount} onChange={setSeriesCount} options={COUNT_OPTIONS} />
+                    </Field>
+                  </div>
+
+                  <div className="nk-callout" style={{ marginTop: 12 }}>
+                    <span>
+                      Se crearán <b className="nk-mono">{seriesDates.length || seriesCount}</b> órdenes
+                      {' '}<b>independientes</b>, numeradas «1/{seriesCount}», «2/{seriesCount}»…
+                      El sistema no guarda la recurrencia: cada orden se edita, inicia y cierra por separado.
+                    </span>
+                  </div>
+
+                  {seriesDates.length > 0 ? (
+                    <div className="nk-series-dates nk-mono">
+                      {seriesDates.map((d, i) => (
+                        <span key={d} className="nk-series-date">{i + 1}. {d}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="nk-series-hint">Selecciona una fecha programada válida para calcular las fechas de la serie.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Modal>

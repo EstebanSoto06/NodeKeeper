@@ -188,3 +188,121 @@ describe('MaintenanceFormModal', () => {
     expect(screen.getByDisplayValue(fixtureEquipmentB.name)).toBeInTheDocument();
   });
 });
+
+/* ---------- Serie recurrente: N ordenes independientes, no una entidad ---------- */
+
+describe('MaintenanceFormModal · serie recurrente', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** Rellena los campos obligatorios de un preventivo valido. */
+  async function fillPreventive(user, container, title = 'Revisión periódica') {
+    await user.type(screen.getByPlaceholderText('Mantenimiento preventivo trimestral'), title);
+    setScheduledDate(container, '2026-01-31');
+    await user.selectOptions(screen.getByDisplayValue('Selecciona un nodo…'), fixtureNodeAvailable.id);
+  }
+
+  async function enableSeries(user) {
+    await user.click(screen.getByLabelText(/Programar como serie recurrente/));
+  }
+
+  it('la opcion no aparece al editar: editar afecta a UNA orden', async () => {
+    await renderReady({
+      maintenance: fixtureMaintenanceInProgress,
+      nodesList: [fixtureNodeAvailable, fixtureNodeMaintenance],
+      equipmentListData: [fixtureEquipmentA, fixtureEquipmentB],
+    });
+
+    expect(screen.queryByText(/Programar como serie recurrente/)).not.toBeInTheDocument();
+  });
+
+  it('al activarla, advierte que las ordenes son independientes y lista las fechas', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderReady();
+    await fillPreventive(user, container);
+    await enableSeries(user);
+
+    expect(screen.getByText('independientes')).toBeInTheDocument();
+    expect(screen.getByText(/no guarda la recurrencia/, { selector: 'span' })).toBeInTheDocument();
+    // Semanal por defecto, 3 ordenes: se muestran las 3 fechas calculadas.
+    expect(screen.getByText('1. 2026-01-31')).toBeInTheDocument();
+    expect(screen.getByText('2. 2026-02-07')).toBeInTheDocument();
+    expect(screen.getByText('3. 2026-02-14')).toBeInTheDocument();
+  });
+
+  it('crea una orden real por cada fecha, numerada y con el resto de datos igual', async () => {
+    const user = userEvent.setup();
+    maintenanceService.create.mockResolvedValue({ maintenance: { id: 'serie' } });
+    const { container, onSaved, onClose } = await renderReady();
+
+    await fillPreventive(user, container);
+    await enableSeries(user);
+    await user.selectOptions(screen.getByDisplayValue('Cada semana'), 'MONTHLY');
+
+    await user.click(screen.getByText('Crear 3 órdenes'));
+
+    await waitFor(() => expect(maintenanceService.create).toHaveBeenCalledTimes(3));
+    const payloads = maintenanceService.create.mock.calls.map(([p]) => p);
+
+    expect(payloads.map((p) => p.title)).toEqual([
+      'Revisión periódica (1/3)',
+      'Revisión periódica (2/3)',
+      'Revisión periódica (3/3)',
+    ]);
+    // 31 de enero + 1 mes cae en el ultimo dia real de febrero, y vuelve al 31.
+    expect(payloads.map((p) => p.scheduledDate)).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+    payloads.forEach((p) => {
+      expect(p.type).toBe('PREVENTIVE');
+      expect(p.networkNodeId).toBe(fixtureNodeAvailable.id);
+      expect(p.equipmentId).toBeNull();
+    });
+
+    expect(onSaved).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('sin activarla, sigue creando una sola orden con el titulo tal cual', async () => {
+    const user = userEvent.setup();
+    maintenanceService.create.mockResolvedValueOnce({ maintenance: { id: 'unica' } });
+    const { container } = await renderReady();
+
+    await fillPreventive(user, container, 'Orden única');
+    await user.click(screen.getByText('Guardar mantenimiento'));
+
+    await waitFor(() => expect(maintenanceService.create).toHaveBeenCalledTimes(1));
+    expect(maintenanceService.create.mock.calls[0][0].title).toBe('Orden única');
+  });
+
+  it('si una orden falla a mitad, informa cuantas se crearon y no cierra el modal', async () => {
+    const user = userEvent.setup();
+    maintenanceService.create
+      .mockResolvedValueOnce({ maintenance: { id: 'serie-1' } })
+      .mockRejectedValueOnce(Object.assign(new Error('El servidor rechazó la solicitud.'), { status: 500 }));
+    const { container, onSaved, onClose } = await renderReady();
+
+    await fillPreventive(user, container);
+    await enableSeries(user);
+    await user.click(screen.getByText('Crear 3 órdenes'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Se crearon 1 de 3 órdenes y se conservan. La orden 2 falló: El servidor rechazó la solicitud.',
+    );
+    expect(maintenanceService.create).toHaveBeenCalledTimes(2);
+    // La orden ya creada es real: se refresca la vista, pero el modal sigue abierto.
+    expect(onSaved).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('la validacion de campos obligatorios se aplica igual en modo serie', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.type(screen.getByPlaceholderText('Mantenimiento preventivo trimestral'), 'Sin fecha ni nodo');
+    await enableSeries(user);
+    await user.click(screen.getByText(/Crear 3 órdenes/));
+
+    expect(screen.getByText('Faltan datos obligatorios: Fecha programada, Nodo.')).toBeInTheDocument();
+    expect(maintenanceService.create).not.toHaveBeenCalled();
+  });
+});
