@@ -35,8 +35,6 @@ export const fixtureInactiveUser = {
   updatedAt: '2026-01-01T08:00:00.000Z',
 };
 
-export const fixtureUsers = [fixtureAdminUser, fixtureOperatorUser, fixtureInactiveUser];
-
 export const fixtureProviderA = {
   id: 'provider-fixture-1',
   companyName: 'Soporte Ficticio del Norte',

@@ -4,10 +4,9 @@
    por URL directa ve AccessDenied antes de llegar aqui. No existe DELETE:
    el modelo prefiere activar/desactivar sobre el borrado fisico. */
 import { useState } from 'react';
-import { PageHeader } from '../components/Misc.jsx';
 import { Button, IconButton } from '../components/Button.jsx';
 import { Card } from '../components/Card.jsx';
-import { Avatar } from '../components/Misc.jsx';
+import { PageHeader, Avatar, initialsFromName } from '../components/Misc.jsx';
 import { SearchInput, FilterChips } from '../components/Inputs.jsx';
 import { LoadingSkeleton } from '../components/LoadingSkeleton.jsx';
 import { ErrorState } from '../components/ErrorState.jsx';
@@ -33,14 +32,6 @@ const STATUS_FILTERS = [
   { value: 'active', label: 'Activos', dot: 'var(--green-500)' },
   { value: 'inactive', label: 'Inactivos', dot: 'var(--gray-400)' },
 ];
-
-function initialsFromName(name) {
-  if (!name) return '??';
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] || '';
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
-  return (first + last).toUpperCase();
-}
 
 export function Users() {
   const { user: currentUser } = useAuth();

@@ -41,7 +41,7 @@ import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { useAsync } from '../hooks/useAsync.js';
-import { validateRequired } from '../utils/formValidation.js';
+import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
 import {
   RECURRENCE_OPTIONS,
   MAX_RECURRENCE_COUNT,
@@ -100,14 +100,6 @@ function emptyForm() {
 function toDateInputValue(iso) {
   if (!iso) return '';
   return String(iso).slice(0, 10);
-}
-
-function fieldErrorsFrom(err) {
-  const out = {};
-  (err?.errors || []).forEach((e) => {
-    if (e.path) out[e.path] = e.message;
-  });
-  return out;
 }
 
 export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {

@@ -108,7 +108,7 @@ async function throwFromResponse(response) {
  *
  * @param {string} path  ruta sin /api (la base ya lo incluye)
  */
-export async function request(path, { method = 'GET', body, isMultipart = false } = {}) {
+async function request(path, { method = 'GET', body, isMultipart = false } = {}) {
   const url = `${resolveBaseUrl()}${path}`;
   const headers = buildHeaders(body, isMultipart);
 
@@ -143,7 +143,7 @@ export async function request(path, { method = 'GET', body, isMultipart = false 
  *
  * @param {string} path  ruta sin /api (la base ya lo incluye)
  */
-export async function requestBlob(path, { method = 'GET' } = {}) {
+async function requestBlob(path, { method = 'GET' } = {}) {
   const url = `${resolveBaseUrl()}${path}`;
   const headers = buildHeaders();
 

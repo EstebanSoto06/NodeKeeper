@@ -3,7 +3,6 @@
    endpoint dedicado equipos-por-proveedor). ADMIN ve editar/eliminar. */
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader } from '../components/Misc.jsx';
 import { Button } from '../components/Button.jsx';
 import { Card } from '../components/Card.jsx';
 import { DataList } from '../components/Modal.jsx';

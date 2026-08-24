@@ -4,7 +4,6 @@
    Mantenimientos está fuera de alcance de este bloque. */
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageHeader } from '../components/Misc.jsx';
 import { Button } from '../components/Button.jsx';
 import { Card } from '../components/Card.jsx';
 import { Icon } from '../components/Icon.jsx';

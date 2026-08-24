@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
-import { validateRequired } from '../utils/formValidation.js';
+import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 
 const NODE_STATUS_OPTIONS = [
@@ -15,14 +15,6 @@ const NODE_STATUS_OPTIONS = [
 ];
 
 const EMPTY = { code: '', name: '', location: '', status: 'AVAILABLE' };
-
-function fieldErrorsFrom(err) {
-  const out = {};
-  (err?.errors || []).forEach((e) => {
-    if (e.path) out[e.path] = e.message;
-  });
-  return out;
-}
 
 export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
   const editing = !!node;

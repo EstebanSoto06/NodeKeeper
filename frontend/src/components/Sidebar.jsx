@@ -7,7 +7,7 @@
    SCHEDULED), ya sin depender de mockData.js. */
 import { NavLink } from 'react-router-dom';
 import { Icon, Logo } from './Icon.jsx';
-import { Avatar } from './Misc.jsx';
+import { Avatar, initialsFromName } from './Misc.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAsync } from '../hooks/useAsync.js';
 import * as maintenanceService from '../services/maintenanceService.js';
@@ -29,14 +29,6 @@ const NAV_ADMIN = [
   { to: '/usuarios', label: 'Usuarios y roles', icon: 'users' },
   { to: '/plantillas', label: 'Plantillas de checklist', icon: 'list' },
 ];
-
-function initialsFromName(name) {
-  if (!name) return '??';
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] || '';
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
-  return (first + last).toUpperCase();
-}
 
 export function Sidebar({ open, onClose }) {
   const { user } = useAuth();

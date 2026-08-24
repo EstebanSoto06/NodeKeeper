@@ -33,3 +33,23 @@ export function fileKindLabel(mimeType) {
   if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'DOCX';
   return 'Documento';
 }
+
+/**
+ * Fuerza la descarga de un blob ya recibido del backend con el nombre
+ * sugerido. Vivia duplicada, identica, en EvidencePanel y EvidencesInfo.
+ *
+ * El objeto URL se revoca siempre tras el click para no filtrar memoria.
+ *
+ * @param {Blob} blob contenido devuelto por apiDownload
+ * @param {string} filename nombre sugerido (Content-Disposition del backend)
+ */
+export function triggerBlobDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'evidencia';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
