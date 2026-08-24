@@ -1,4 +1,6 @@
-/* Primitivas auxiliares: Avatar, PageHeader y Empty (estado vacío). */
+/* Primitivas auxiliares: Avatar, PageHeader y Empty (estado vacío).
+   initialsFromName vive aquí por ser el acompañante natural de Avatar: vivía
+   duplicada, idéntica, en Sidebar y Users. */
 import { Icon } from './Icon.jsx';
 
 export function Avatar({ initials, color = 'var(--blue-600)', size = 34 }) {
@@ -30,4 +32,13 @@ export function Empty({ icon = 'inbox', title, sub }) {
       {sub && <div className="nk-empty-sub">{sub}</div>}
     </div>
   );
+}
+
+/** Iniciales (primera + última palabra) para el Avatar. '??' si no hay nombre. */
+export function initialsFromName(name) {
+  if (!name) return '??';
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] || '';
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase();
 }

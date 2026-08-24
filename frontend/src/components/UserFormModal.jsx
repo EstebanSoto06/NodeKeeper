@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button, IconButton } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
-import { validateRequired } from '../utils/formValidation.js';
+import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
 import * as userService from '../services/userService.js';
 
 const ROLE_OPTIONS = [
@@ -18,14 +18,6 @@ const ROLE_OPTIONS = [
 
 function emptyForm() {
   return { name: '', email: '', password: '', role: 'OPERATOR' };
-}
-
-function fieldErrorsFrom(err) {
-  const out = {};
-  (err?.errors || []).forEach((e) => {
-    if (e.path) out[e.path] = e.message;
-  });
-  return out;
 }
 
 export function UserFormModal({ user, isSelf, onClose, onSaved }) {

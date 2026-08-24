@@ -12,7 +12,7 @@ const MAX_DESCRIPTION_LENGTH = 200;
 // "revision" y "revisión" son palabras distintas, y el proyecto ya cuida los
 // acentos de forma explicita (ver utils/evidence-file.js). El texto que se
 // persiste es siempre el original con trim, nunca esta forma normalizada.
-export function normalizeForComparison(value) {
+function normalizeForComparison(value) {
   return String(value).trim().toLowerCase().replace(/\s+/g, " ");
 }
 

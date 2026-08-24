@@ -33,3 +33,22 @@ export function validateRequired(fields) {
     formError: buildRequiredFieldsError(missing.map((f) => f.label)),
   };
 }
+
+/**
+ * Convierte el `errors[]` de una respuesta 400 del backend (Zod) en un mapa
+ * { path: mensaje } listo para pintar cada campo del formulario.
+ *
+ * Vivia duplicada, identica, en los seis modales de formulario; se centraliza
+ * aqui porque todos consumen el MISMO contrato de error del backend (ver
+ * errorHandler en backend/src/middlewares/error.middleware.js).
+ *
+ * @param {{errors?: {path?: string, message?: string}[]}} err error de apiClient
+ * @returns {Record<string,string>}
+ */
+export function fieldErrorsFrom(err) {
+  const out = {};
+  (err?.errors || []).forEach((e) => {
+    if (e.path) out[e.path] = e.message;
+  });
+  return out;
+}

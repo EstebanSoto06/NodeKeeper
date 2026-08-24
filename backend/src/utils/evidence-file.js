@@ -43,11 +43,6 @@ export function getQuarantineFilePath(fileName) {
   return path.join(resolveQuarantineDir(), fileName);
 }
 
-export async function ensureUploadDirectories() {
-  await fs.mkdir(resolveUploadDir(), { recursive: true });
-  await fs.mkdir(resolveQuarantineDir(), { recursive: true });
-}
-
 // Detecta el tipo real inspeccionando los bytes del archivo ya escrito en
 // disco. Devuelve undefined si no reconoce ninguna firma (p. ej. un
 // ejecutable renombrado), lo cual el llamador debe tratar como invalido.

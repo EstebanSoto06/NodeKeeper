@@ -21,7 +21,7 @@ function crc32(buffer) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-export function buildZip(entries) {
+function buildZip(entries) {
   const localChunks = [];
   const centralChunks = [];
   let offset = 0;

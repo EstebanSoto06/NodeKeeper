@@ -8,7 +8,7 @@ import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { useAsync } from '../hooks/useAsync.js';
-import { validateRequired } from '../utils/formValidation.js';
+import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
 import * as equipmentService from '../services/equipmentService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as supportProviderService from '../services/supportProviderService.js';
@@ -28,14 +28,6 @@ function emptyForm(defaultNodeId) {
     networkNodeId: defaultNodeId || '',
     supportProviderId: '',
   };
-}
-
-function fieldErrorsFrom(err) {
-  const out = {};
-  (err?.errors || []).forEach((e) => {
-    if (e.path) out[e.path] = e.message;
-  });
-  return out;
 }
 
 export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved }) {

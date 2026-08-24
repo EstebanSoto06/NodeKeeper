@@ -29,7 +29,7 @@ import { LoadingSkeleton } from '../components/LoadingSkeleton.jsx';
 import { ErrorState } from '../components/ErrorState.jsx';
 import { EmptyState } from '../components/EmptyState.jsx';
 import { useAsync } from '../hooks/useAsync.js';
-import { formatSize, iconForMimeType, isImageMimeType, fileKindLabel } from '../utils/evidenceFormat.js';
+import { formatSize, iconForMimeType, isImageMimeType, fileKindLabel, triggerBlobDownload } from '../utils/evidenceFormat.js';
 import * as maintenanceService from '../services/maintenanceService.js';
 import * as evidenceService from '../services/evidenceService.js';
 
@@ -41,17 +41,6 @@ const KIND_FILTERS = [
 
 // Dispara la descarga de un blob ya obtenido, sin exponer una URL publica
 // permanente: se crea un object URL, se usa una unica vez y se libera.
-function triggerBlobDownload(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'evidencia';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 /* Aplana maintenances[].evidences[] en una sola lista, adjuntando a cada
    evidencia los datos de SU mantenimiento (titulo y estado), que ya vienen en
    la misma respuesta. Se ordena por fecha de carga descendente: lo ultimo

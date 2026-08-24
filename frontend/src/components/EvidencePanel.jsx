@@ -11,7 +11,7 @@
    real de "excede el tamano" siempre lo valida y devuelve el backend. */
 import { useRef, useState } from 'react';
 import { Card } from './Card.jsx';
-import { Button, IconButton } from './Button.jsx';
+import { IconButton } from './Button.jsx';
 import { Icon } from './Icon.jsx';
 import { EmptyState } from './EmptyState.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
@@ -19,23 +19,10 @@ import { ErrorState } from './ErrorState.jsx';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { useAsync } from '../hooks/useAsync.js';
-import { formatSize, iconForMimeType, isImageMimeType } from '../utils/evidenceFormat.js';
+import { formatSize, iconForMimeType, isImageMimeType, triggerBlobDownload } from '../utils/evidenceFormat.js';
 import * as evidenceService from '../services/evidenceService.js';
 
 const ACCEPT = '.jpg,.jpeg,.png,.pdf,.docx,image/jpeg,image/png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-// Dispara la descarga de un blob ya obtenido, sin exponer una URL publica
-// permanente: se crea un object URL, se usa una unica vez y se libera.
-function triggerBlobDownload(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'evidencia';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 export function EvidencePanel({ maintenanceId, status, isCompleted }) {
   const perms = usePermissions();

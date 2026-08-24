@@ -5,20 +5,10 @@ import { useState } from 'react';
 import { Modal, DataList } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput } from './Inputs.jsx';
-import { validateRequired } from '../utils/formValidation.js';
+import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
 import * as supportProviderService from '../services/supportProviderService.js';
 
 const EMPTY = { companyName: '', supportPhone: '', supportEmail: '', contactName: '', contactPhone: '', contactEmail: '' };
-
-// Mapea ApiError.errors ([{path,message}]) a un objeto {campo: mensaje} para
-// mostrarlo bajo cada Field del formulario.
-function fieldErrorsFrom(err) {
-  const out = {};
-  (err?.errors || []).forEach((e) => {
-    if (e.path) out[e.path] = e.message;
-  });
-  return out;
-}
 
 export function ProviderFormModal({ provider, onClose, onSaved }) {
   const editing = !!provider;

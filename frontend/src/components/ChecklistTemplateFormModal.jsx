@@ -25,20 +25,12 @@ import { Modal } from './Modal.jsx';
 import { Button, IconButton } from './Button.jsx';
 import { Field, TextInput } from './Inputs.jsx';
 import { Icon } from './Icon.jsx';
-import { validateRequired } from '../utils/formValidation.js';
+import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
 import { findDuplicateItemIndexes } from '../utils/checklistTemplates.js';
 import * as checklistTemplateService from '../services/checklistTemplateService.js';
 import { showToast } from '../store/store.js';
 
 const MAX_ITEMS = 50;
-
-function fieldErrorsFrom(err) {
-  const out = {};
-  (err?.errors || []).forEach((e) => {
-    if (e.path) out[e.path] = e.message;
-  });
-  return out;
-}
 
 export function ChecklistTemplateFormModal({ template, onClose, onSaved }) {
   const editing = !!template;
