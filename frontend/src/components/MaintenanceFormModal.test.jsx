@@ -8,25 +8,31 @@ import {
   fixtureEquipmentA,
   fixtureEquipmentB,
   fixtureMaintenanceInProgress,
+  fixtureChecklistTemplates,
+  fixtureTemplateUps,
 } from '../test/fixtures.js';
 
 vi.mock('../services/maintenanceService.js', () => ({ create: vi.fn(), update: vi.fn() }));
 vi.mock('../services/networkNodeService.js', () => ({ list: vi.fn() }));
 vi.mock('../services/equipmentService.js', () => ({ list: vi.fn() }));
+vi.mock('../services/checklistTemplateService.js', () => ({ list: vi.fn() }));
 
 import * as maintenanceService from '../services/maintenanceService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as equipmentService from '../services/equipmentService.js';
+import * as checklistTemplateService from '../services/checklistTemplateService.js';
 
 async function renderReady({
   maintenance,
   nodesList = [fixtureNodeAvailable],
   equipmentListData = [fixtureEquipmentA],
+  templatesList = fixtureChecklistTemplates,
   onClose = vi.fn(),
   onSaved = vi.fn(),
 } = {}) {
   networkNodeService.list.mockResolvedValueOnce({ networkNodes: nodesList });
   equipmentService.list.mockResolvedValueOnce({ equipment: equipmentListData });
+  checklistTemplateService.list.mockResolvedValue({ checklistTemplates: templatesList });
   const utils = render(<MaintenanceFormModal maintenance={maintenance} onClose={onClose} onSaved={onSaved} />);
   await waitFor(() => expect(screen.getByPlaceholderText('Mantenimiento preventivo trimestral')).toBeInTheDocument());
   return { ...utils, onClose, onSaved };
@@ -304,5 +310,127 @@ describe('MaintenanceFormModal · serie recurrente', () => {
 
     expect(screen.getByText('Faltan datos obligatorios: Fecha programada, Nodo.')).toBeInTheDocument();
     expect(maintenanceService.create).not.toHaveBeenCalled();
+  });
+});
+
+/* Selector "Lista de tareas". El valor por defecto ("Sin lista de tareas")
+   debe reproducir EXACTAMENTE el comportamiento anterior a esta
+   funcionalidad: sin checklistTemplateId en el payload. */
+describe('MaintenanceFormModal · lista de tareas', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function fillRequired(user, container) {
+    await user.type(screen.getByPlaceholderText('Mantenimiento preventivo trimestral'), 'Orden con lista');
+    setScheduledDate(container, '2026-09-01');
+    await user.selectOptions(screen.getByDisplayValue('Selecciona un nodo…'), fixtureNodeAvailable.id);
+  }
+
+  function templateSelect() {
+    return screen.getByDisplayValue('Sin lista de tareas');
+  }
+
+  it('ofrece "Sin lista de tareas" como valor por defecto', async () => {
+    await renderReady();
+
+    expect(screen.getByText('Lista de tareas')).toBeInTheDocument();
+    expect(templateSelect()).toBeInTheDocument();
+  });
+
+  it('lista las plantillas disponibles con su numero de tareas', async () => {
+    await renderReady();
+
+    expect(
+      screen.getByRole('option', { name: 'Mantenimiento preventivo UPS (3 tareas)' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'Revisión trimestral de nodo (1 tarea)' }),
+    ).toBeInTheDocument();
+  });
+
+  it('sin seleccionar lista, el payload NO incluye checklistTemplateId', async () => {
+    const user = userEvent.setup();
+    maintenanceService.create.mockResolvedValueOnce({ maintenance: { id: 'nuevo' } });
+
+    const { container } = await renderReady();
+    await fillRequired(user, container);
+    await user.click(screen.getByText('Guardar mantenimiento'));
+
+    await waitFor(() => expect(maintenanceService.create).toHaveBeenCalled());
+    const payload = maintenanceService.create.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('checklistTemplateId');
+  });
+
+  it('al seleccionar una lista, el payload incluye su id', async () => {
+    const user = userEvent.setup();
+    maintenanceService.create.mockResolvedValueOnce({ maintenance: { id: 'nuevo' } });
+
+    const { container } = await renderReady();
+    await fillRequired(user, container);
+    await user.selectOptions(templateSelect(), fixtureTemplateUps.id);
+    await user.click(screen.getByText('Guardar mantenimiento'));
+
+    await waitFor(() =>
+      expect(maintenanceService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ checklistTemplateId: fixtureTemplateUps.id }),
+      ),
+    );
+  });
+
+  it('anuncia cuantas tareas se copiaran al elegir una lista', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.selectOptions(templateSelect(), fixtureTemplateUps.id);
+
+    expect(screen.getByText(/Se copiarán 3 tareas al checklist/)).toBeInTheDocument();
+  });
+
+  it('NO ofrece el selector al editar una orden existente', async () => {
+    await renderReady({ maintenance: fixtureMaintenanceInProgress });
+
+    expect(screen.queryByText('Lista de tareas')).not.toBeInTheDocument();
+    expect(checklistTemplateService.list).not.toHaveBeenCalled();
+  });
+
+  it('si la carga de plantillas falla, el formulario sigue siendo utilizable', async () => {
+    const user = userEvent.setup();
+    networkNodeService.list.mockResolvedValueOnce({ networkNodes: [fixtureNodeAvailable] });
+    equipmentService.list.mockResolvedValueOnce({ equipment: [fixtureEquipmentA] });
+    checklistTemplateService.list.mockRejectedValue(new Error('403'));
+    maintenanceService.create.mockResolvedValueOnce({ maintenance: { id: 'nuevo' } });
+
+    const { container } = render(
+      <MaintenanceFormModal onClose={vi.fn()} onSaved={vi.fn()} />,
+    );
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('Mantenimiento preventivo trimestral')).toBeInTheDocument(),
+    );
+
+    // El selector se degrada a la unica opcion segura.
+    expect(screen.getByDisplayValue('Sin lista de tareas')).toBeInTheDocument();
+
+    await fillRequired(user, container);
+    await user.click(screen.getByText('Guardar mantenimiento'));
+
+    await waitFor(() => expect(maintenanceService.create).toHaveBeenCalled());
+    expect(maintenanceService.create.mock.calls[0][0]).not.toHaveProperty('checklistTemplateId');
+  });
+
+  it('serie recurrente + lista: las N ordenes llevan el mismo checklistTemplateId', async () => {
+    const user = userEvent.setup();
+    maintenanceService.create.mockResolvedValue({ maintenance: { id: 'nuevo' } });
+
+    const { container } = await renderReady();
+    await fillRequired(user, container);
+    await user.selectOptions(templateSelect(), fixtureTemplateUps.id);
+    await user.click(screen.getByLabelText(/Programar como serie recurrente/i));
+    await user.click(screen.getByText(/Crear 3 órdenes/));
+
+    await waitFor(() => expect(maintenanceService.create).toHaveBeenCalledTimes(3));
+    maintenanceService.create.mock.calls.forEach(([payload]) => {
+      expect(payload.checklistTemplateId).toBe(fixtureTemplateUps.id);
+    });
   });
 });

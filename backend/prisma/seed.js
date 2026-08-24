@@ -69,6 +69,45 @@ async function main() {
   await prisma.equipment.deleteMany();
   await prisma.networkNode.deleteMany();
   await prisma.supportProvider.deleteMany();
+  // Los items caen por cascade al borrar la plantilla.
+  await prisma.checklistTemplate.deleteMany();
+
+  // Listas de tareas reutilizables. Se siembran para que la demo tenga
+  // plantillas seleccionables desde el primer arranque; no las referencia
+  // ningun mantenimiento (aplicarlas COPIA sus tareas, no las enlaza).
+  await prisma.checklistTemplate.create({
+    data: {
+      name: "Mantenimiento preventivo UPS",
+      description: "Rutina trimestral de revision de una unidad UPS.",
+      createdById: admin.id,
+      items: {
+        create: [
+          { description: "Revisar voltaje de entrada", sortOrder: 0 },
+          { description: "Revisar baterias", sortOrder: 1 },
+          { description: "Limpiar equipo", sortOrder: 2 },
+          { description: "Verificar alarmas", sortOrder: 3 },
+          { description: "Registrar lectura final", sortOrder: 4 },
+        ],
+      },
+    },
+  });
+
+  await prisma.checklistTemplate.create({
+    data: {
+      name: "Revision trimestral de nodo",
+      description: "Inspeccion general de un nodo de red y su entorno.",
+      createdById: admin.id,
+      items: {
+        create: [
+          { description: "Verificar estado del gabinete", sortOrder: 0 },
+          { description: "Revisar conexiones de fibra", sortOrder: 1 },
+          { description: "Comprobar temperatura del sitio", sortOrder: 2 },
+          { description: "Revisar sistema de respaldo electrico", sortOrder: 3 },
+          { description: "Actualizar bitacora del nodo", sortOrder: 4 },
+        ],
+      },
+    },
+  });
 
   const providerA = await prisma.supportProvider.create({
     data: {

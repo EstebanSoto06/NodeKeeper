@@ -28,11 +28,12 @@ Navegador ── SPA (React/Vite) ── fetch (VITE_API_URL) ──▶ API (Exp
 
 ## Base de datos
 
-PostgreSQL. Entidades principales: `User`, `SupportProvider`, `NetworkNode`, `Equipment`, `Maintenance`, `ChecklistTask`, `Evidence`. Relaciones relevantes:
+PostgreSQL. Entidades principales: `User`, `SupportProvider`, `NetworkNode`, `Equipment`, `Maintenance`, `ChecklistTask`, `Evidence`, `ChecklistTemplate`, `ChecklistTemplateItem`. Relaciones relevantes:
 
 - `Equipment.networkNodeId` obligatorio (un equipo pertenece a un nodo).
 - `Equipment.supportProviderId` opcional (`ON DELETE SET NULL`): al eliminar un proveedor, sus equipos quedan como "No asignado", nunca se eliminan.
 - `Maintenance` es preventivo (ligado a `NetworkNode`) o correctivo (ligado a `Equipment`), con `ChecklistTask[]` y `Evidence[]` propias.
+- `ChecklistTemplate` tiene sus propios `ChecklistTemplateItem[]` (`ON DELETE CASCADE`) y **ninguna relación con `Maintenance` ni con `ChecklistTask`, en ninguna dirección**. Aplicar una plantilla *copia* sus items al checklist; la ausencia de clave foránea es lo que garantiza estructuralmente que editar o eliminar una plantilla no pueda afectar a mantenimientos ya creados. `ChecklistTemplate.name` es único y `createdById` usa `ON DELETE SET NULL`.
 - `Maintenance.networkNodeId`/`Maintenance.equipmentId` usan `ON DELETE RESTRICT`: el historial de mantenimiento está protegido a nivel de base de datos. Un `NetworkNode` o `Equipment` con al menos un `Maintenance` asociado no puede eliminarse (la eliminación falla con un 409, tanto si la rechaza la comprobación previa del servicio como si la rechaza directamente la restricción de clave foránea ante una carrera concurrente). Un nodo sin historial sigue pudiendo eliminarse junto con sus equipos sin historial, vía el `ON DELETE CASCADE` de `Equipment.networkNodeId` (sin cambios).
 
 ## Autenticación
@@ -59,6 +60,17 @@ JWT firmado con `JWT_SECRET`, emitido en `POST /auth/login` tras verificar la co
 ## Checklist
 
 Tareas (`ChecklistTask`) con `isCompleted`, `completedAt`, `completedById`. `PATCH /:taskId/status` recibe `isCompleted` explícito (no un toggle implícito) para evitar condiciones de carrera de intención. El backend recalcula el avance real desde la base de datos al validar el cierre del mantenimiento, no confía en el porcentaje que envíe el cliente.
+
+## Plantillas de checklist
+
+`ChecklistTemplate` + `ChecklistTemplateItem` son **listas de tareas reutilizables**. La decisión de diseño central es que aplicar una plantilla **copia** sus items al checklist del mantenimiento: solo viaja la `description`, y la `ChecklistTask` resultante no guarda ninguna referencia a su origen. No hay relación viva, ni sincronización posterior, ni versionado.
+
+Se aplican por dos vías, ambas atómicas:
+
+- **Al crear la orden**: `POST /maintenances` con `checklistTemplateId`. Orden + tareas en una transacción (aislamiento por defecto: la fila recién creada no es visible para ninguna otra transacción, así que solo hace falta atomicidad).
+- **Sobre una orden existente**: `POST /maintenances/:id/checklist-tasks/apply-template`. Usa `runSerializableTransaction`, igual que el resto del módulo de checklist: lee `Maintenance.status` y escribe `ChecklistTask`, la dirección opuesta a `completeMaintenance`, y PostgreSQL solo detecta ese ciclo si ambos lados corren en `Serializable`.
+
+Las tareas se agregan al final del checklist partiendo de `MAX(sortOrder) + 1`, no de un conteo de filas: el ADMIN puede haber borrado tareas intermedias y contar produciría posiciones ya ocupadas.
 
 ## Evidences
 

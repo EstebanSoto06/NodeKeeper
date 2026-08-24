@@ -44,8 +44,8 @@ const maintenanceInclude = {
   evidences: evidencesInclude,
 };
 
-async function assertNetworkNodeExists(networkNodeId) {
-  const networkNode = await prisma.networkNode.findUnique({
+async function assertNetworkNodeExists(client, networkNodeId) {
+  const networkNode = await client.networkNode.findUnique({
     where: { id: networkNodeId },
   });
 
@@ -54,8 +54,8 @@ async function assertNetworkNodeExists(networkNodeId) {
   }
 }
 
-async function assertEquipmentExists(equipmentId) {
-  const equipment = await prisma.equipment.findUnique({
+async function assertEquipmentExists(client, equipmentId) {
+  const equipment = await client.equipment.findUnique({
     where: { id: equipmentId },
   });
 
@@ -64,13 +64,20 @@ async function assertEquipmentExists(equipmentId) {
   }
 }
 
-async function prepareMaintenanceData(data) {
+// Recibe el cliente Prisma como primer argumento (mismo patron que
+// getMaintenanceOrThrow/getChecklistTaskOrThrow en checklist-task.service.js)
+// para poder correr DENTRO de la transaccion de createMaintenance: si estas
+// lecturas usaran el cliente global quedarian fuera de ella, y el nodo o el
+// equipo podrian desaparecer entre la comprobacion y el INSERT sin que la
+// transaccion se enterara. updateMaintenance le pasa `prisma` y conserva
+// exactamente el comportamiento que ya tenia.
+async function prepareMaintenanceData(client, data) {
   if (data.type === "PREVENTIVE") {
     if (!data.networkNodeId) {
       throw createHttpError(400, "Preventive maintenance requires a network node");
     }
 
-    await assertNetworkNodeExists(data.networkNodeId);
+    await assertNetworkNodeExists(client, data.networkNodeId);
 
     return { ...data, equipmentId: null };
   }
@@ -79,7 +86,7 @@ async function prepareMaintenanceData(data) {
     throw createHttpError(400, "Corrective maintenance requires equipment");
   }
 
-  await assertEquipmentExists(data.equipmentId);
+  await assertEquipmentExists(client, data.equipmentId);
 
   return { ...data, networkNodeId: null };
 }
@@ -120,16 +127,75 @@ function rethrowAsNotFoundOnForeignKeyViolation(error) {
   throw error;
 }
 
+// La orden y las tareas de su plantilla se crean en UNA sola transaccion: si
+// la copia del checklist falla a mitad, no puede quedar un mantenimiento sin
+// las tareas que el ADMIN pidio, ni un mantenimiento a medio poblar.
+//
+// Se usa la transaccion por defecto (READ COMMITTED) y no
+// runSerializableTransaction a proposito: la orden acaba de nacer y su id no
+// existe para ninguna otra transaccion, asi que no hay lectura-escritura
+// cruzada que Serializable pudiera proteger. Lo unico que hace falta aqui es
+// atomicidad, que la transaccion por defecto ya garantiza. En cambio
+// applyChecklistTemplate SI necesita Serializable, porque alli el
+// mantenimiento ya existe y otras transacciones pueden estar tocandolo.
 export async function createMaintenance(data, userId) {
-  const preparedData = await prepareMaintenanceData(data);
+  const { checklistTemplateId, ...maintenanceData } = data;
 
   try {
-    return await prisma.maintenance.create({
-      data: {
-        ...preparedData,
-        createdById: userId,
-      },
-      include: maintenanceInclude,
+    return await prisma.$transaction(async (tx) => {
+      const preparedData = await prepareMaintenanceData(tx, maintenanceData);
+
+      // La plantilla se resuelve ANTES de crear nada: con un id invalido el
+      // 404 llega sin haber escrito una sola fila. El rollback tambien lo
+      // cubriria, pero fallar temprano es mas barato y mas claro.
+      let templateItems = [];
+
+      if (checklistTemplateId) {
+        const template = await tx.checklistTemplate.findUnique({
+          where: { id: checklistTemplateId },
+          include: {
+            items: {
+              orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            },
+          },
+        });
+
+        if (!template) {
+          throw createHttpError(404, "Checklist template not found");
+        }
+
+        if (template.items.length === 0) {
+          throw createHttpError(409, "The checklist template has no tasks");
+        }
+
+        templateItems = template.items;
+      }
+
+      const maintenance = await tx.maintenance.create({
+        data: {
+          ...preparedData,
+          createdById: userId,
+        },
+        select: { id: true },
+      });
+
+      if (templateItems.length > 0) {
+        // Copia por valor, igual que applyChecklistTemplate: solo la
+        // descripcion. El checklist esta vacio (la orden acaba de crearse),
+        // asi que el orden arranca en 0.
+        await tx.checklistTask.createMany({
+          data: templateItems.map((item, index) => ({
+            maintenanceId: maintenance.id,
+            description: item.description,
+            sortOrder: index,
+          })),
+        });
+      }
+
+      return tx.maintenance.findUnique({
+        where: { id: maintenance.id },
+        include: maintenanceInclude,
+      });
     });
   } catch (error) {
     return rethrowAsNotFoundOnForeignKeyViolation(error);
@@ -157,7 +223,7 @@ export async function updateMaintenance(id, data) {
     throw createHttpError(409, CLOSED_MAINTENANCE_ERROR);
   }
 
-  const preparedData = await prepareMaintenanceData(data);
+  const preparedData = await prepareMaintenanceData(prisma, data);
 
   let result;
 

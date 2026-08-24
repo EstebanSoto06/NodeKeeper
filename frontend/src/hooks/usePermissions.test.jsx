@@ -19,6 +19,7 @@ function Probe() {
       <span data-testid="structureInProgress">{String(p.canManageChecklistStructureFor('IN_PROGRESS'))}</span>
       <span data-testid="toggleInProgress">{String(p.canToggleChecklistFor('IN_PROGRESS'))}</span>
       <span data-testid="toggleScheduled">{String(p.canToggleChecklistFor('SCHEDULED'))}</span>
+      <span data-testid="manageTemplates">{String(p.canManageChecklistTemplates)}</span>
     </div>
   );
 }
@@ -69,5 +70,17 @@ describe('usePermissions', () => {
     expect(screen.getByTestId('isAdmin')).toHaveTextContent('false');
     expect(screen.getByTestId('isOperator')).toHaveTextContent('false');
     expect(screen.getByTestId('uploadInProgress')).toHaveTextContent('false');
+    expect(screen.getByTestId('manageTemplates')).toHaveTextContent('false');
+  });
+
+  /* Las plantillas de checklist son ADMIN-only INCLUSO para leer, a
+     diferencia de los catalogos: el backend rechaza con 403 las cinco rutas
+     del modulo (checklist-template.routes.js). */
+  it('las plantillas de checklist son exclusivas de ADMIN', () => {
+    renderAs(adminAuthValue());
+    expect(screen.getByTestId('manageTemplates')).toHaveTextContent('true');
+
+    renderAs(operatorAuthValue());
+    expect(screen.getAllByTestId('manageTemplates')[1]).toHaveTextContent('false');
   });
 });

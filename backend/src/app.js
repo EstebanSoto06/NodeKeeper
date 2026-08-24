@@ -13,6 +13,7 @@ import networkNodeRoutes from "./modules/network-nodes/network-node.routes.js";
 import equipmentRoutes from "./modules/equipment/equipment.routes.js";
 import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
 import checklistTaskRoutes from "./modules/checklist-tasks/checklist-task.routes.js";
+import checklistTemplateRoutes from "./modules/checklist-templates/checklist-template.routes.js";
 import evidenceRoutes from "./modules/evidences/evidence.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
 import healthRoutes from "./routes/health.routes.js";
@@ -71,6 +72,7 @@ app.use(
   checklistTaskRoutes,
 );
 app.use("/api/maintenances/:maintenanceId/evidences", evidenceRoutes);
+app.use("/api/checklist-templates", checklistTemplateRoutes);
 app.use("/api/users", userRoutes);
 
 app.use(notFoundHandler);

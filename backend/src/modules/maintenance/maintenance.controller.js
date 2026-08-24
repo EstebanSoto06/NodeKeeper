@@ -7,7 +7,10 @@ import {
   startMaintenance,
   completeMaintenance,
 } from "./maintenance.service.js";
-import { maintenanceSchema } from "./maintenance.schema.js";
+import {
+  maintenanceSchema,
+  createMaintenanceSchema,
+} from "./maintenance.schema.js";
 
 export async function list(req, res, next) {
   try {
@@ -39,7 +42,9 @@ export async function getById(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const data = maintenanceSchema.parse(req.body);
+    // createMaintenanceSchema (no maintenanceSchema): solo el alta acepta
+    // checklistTemplateId. `update` mas abajo sigue usando maintenanceSchema.
+    const data = createMaintenanceSchema.parse(req.body);
     const maintenance = await createMaintenance(data, req.user.id);
 
     return res.status(201).json({

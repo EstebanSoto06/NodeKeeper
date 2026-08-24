@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Share2, Server, Wrench, CalendarDays, Map as MapIcon, Image as ImageIcon,
   BarChart3, Users, Settings, Menu, Search, Plus, Bell, LogOut, Download, Repeat, Lock,
   CheckCircle2, Paperclip, Check, UploadCloud, FileText, ArrowLeft, ArrowRight, MapPin, Pencil,
-  ChevronRight, ChevronLeft, SlidersHorizontal, List, Eye, Printer, UserPlus, MoreHorizontal,
+  ChevronRight, ChevronLeft, ChevronUp, ChevronDown, SlidersHorizontal, List, Eye, Printer, UserPlus, MoreHorizontal,
   HardHat, Shield, AlertCircle, SearchX, Circle, Building2, Phone, Mail, X, Trash2, ExternalLink,
 } from 'lucide-react';
 
@@ -17,7 +17,8 @@ const ICONS = {
   'log-out': LogOut, download: Download, repeat: Repeat, lock: Lock, 'check-circle-2': CheckCircle2,
   paperclip: Paperclip, check: Check, 'upload-cloud': UploadCloud, 'file-text': FileText,
   'arrow-left': ArrowLeft, 'arrow-right': ArrowRight, 'map-pin': MapPin, pencil: Pencil,
-  'chevron-right': ChevronRight, 'chevron-left': ChevronLeft, 'sliders-horizontal': SlidersHorizontal,
+  'chevron-right': ChevronRight, 'chevron-left': ChevronLeft, 'chevron-up': ChevronUp,
+  'chevron-down': ChevronDown, 'sliders-horizontal': SlidersHorizontal,
   list: List, eye: Eye, printer: Printer, 'user-plus': UserPlus, 'more-horizontal': MoreHorizontal,
   'hard-hat': HardHat, shield: Shield, 'alert-circle': AlertCircle, 'search-x': SearchX,
   'building-2': Building2, phone: Phone, mail: Mail, x: X, 'trash-2': Trash2, 'external-link': ExternalLink,

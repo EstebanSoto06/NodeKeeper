@@ -30,3 +30,16 @@ export const checklistTaskStatusSchema = z
     }),
   })
   .strict();
+
+// Body de POST .../checklist-tasks/apply-template. Solo viaja el id de la
+// plantilla: las descripciones y su orden se leen SIEMPRE del servidor, para
+// que un cliente no pueda inyectar tareas arbitrarias haciendolas pasar por
+// el contenido de una plantilla.
+export const applyChecklistTemplateSchema = z
+  .object({
+    templateId: z
+      .string({ required_error: "templateId is required" })
+      .trim()
+      .min(1, "templateId is required"),
+  })
+  .strict();

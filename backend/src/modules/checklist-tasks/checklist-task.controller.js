@@ -4,11 +4,13 @@ import {
   updateChecklistTask,
   deleteChecklistTask,
   setChecklistTaskStatus,
+  applyChecklistTemplate,
 } from "./checklist-task.service.js";
 import {
   createChecklistTaskSchema,
   updateChecklistTaskSchema,
   checklistTaskStatusSchema,
+  applyChecklistTemplateSchema,
 } from "./checklist-task.schema.js";
 
 export async function list(req, res, next) {
@@ -70,6 +72,24 @@ export async function remove(req, res, next) {
       success: true,
       message: "Checklist task deleted successfully",
       data: null,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function applyTemplate(req, res, next) {
+  try {
+    const data = applyChecklistTemplateSchema.parse(req.body);
+    const checklistTasks = await applyChecklistTemplate(
+      req.params.maintenanceId,
+      data.templateId,
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Checklist template applied successfully",
+      data: { checklistTasks },
     });
   } catch (error) {
     return next(error);

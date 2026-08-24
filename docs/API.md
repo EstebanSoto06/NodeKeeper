@@ -82,11 +82,19 @@ Error:
 | Método | Ruta | Rol | Propósito |
 |---|---|---|---|
 | GET | `/`, `/:id` | ADMIN, OPERATOR | Listar / detalle (incluye checklist y evidencias) |
-| POST | `/` | ADMIN | Crear preventivo (`networkNodeId`) o correctivo (`equipmentId`) |
-| PUT | `/:id` | ADMIN | Editar datos generales |
+| POST | `/` | ADMIN | Crear preventivo (`networkNodeId`) o correctivo (`equipmentId`); acepta `checklistTemplateId` opcional |
+| PUT | `/:id` | ADMIN | Editar datos generales (**no** acepta `checklistTemplateId`) |
 | DELETE | `/:id` | ADMIN | Eliminar |
 | POST | `/:id/start` | ADMIN, OPERATOR | SCHEDULED → IN_PROGRESS |
 | POST | `/:id/complete` | ADMIN, OPERATOR | IN_PROGRESS → COMPLETED; 409/400 si el checklist no está al 100% |
+
+### Crear con una lista de tareas predefinida
+
+`POST /maintenances` acepta un campo **opcional** `checklistTemplateId`. Si se envía, la orden se crea **y** las tareas de esa plantilla se copian a su checklist dentro de **una sola transacción**: si algo falla, no queda ni el mantenimiento ni un checklist a medias. La respuesta ya incluye `checklistTasks` poblado.
+
+Si el campo se omite o llega como `null`, el comportamiento es exactamente el de siempre (orden sin tareas). Si el `checklistTemplateId` no existe, la respuesta es `404` y **no se crea el mantenimiento**.
+
+`PUT /maintenances/:id` **no** contempla este campo: aplicar una lista a una orden ya creada se hace con `apply-template` (ver abajo). Como el schema del PUT no es estricto, un `checklistTemplateId` enviado ahí se ignora en silencio, igual que cualquier otro campo desconocido en esa ruta.
 
 ## checklist-tasks — `/api/maintenances/:maintenanceId/checklist-tasks`
 
@@ -99,8 +107,51 @@ La autorización combina **rol** y **estado del mantenimiento**: ambos se valida
 | PUT | `/:taskId` | ADMIN | SCHEDULED | Editar descripción/orden de una tarea |
 | DELETE | `/:taskId` | ADMIN | SCHEDULED | Eliminar tarea |
 | PATCH | `/:taskId/status` | ADMIN, OPERATOR | IN_PROGRESS | Marcar/desmarcar (`isCompleted` explícito en el payload) |
+| POST | `/apply-template` | ADMIN | SCHEDULED | Copiar al checklist las tareas de una plantilla (`{ "templateId": "..." }`) |
 
 En resumen: la **estructura** del checklist (crear/editar/eliminar tareas) solo la gestiona un ADMIN mientras el mantenimiento está `SCHEDULED`; una vez iniciado queda congelada. **Marcar o desmarcar** tareas lo hacen ADMIN u OPERATOR, y solo mientras el mantenimiento está `IN_PROGRESS`.
+
+`apply-template` es una modificación estructural más, con **las mismas reglas exactas que crear una tarea**: solo ADMIN, solo en `SCHEDULED`, y el mismo mensaje de `409` fuera de ese estado. Corre en una transacción `Serializable` y devuelve el checklist **completo** ya ordenado, no solo las tareas nuevas.
+
+- Las tareas de la plantilla se **agregan al final**; ninguna tarea existente se elimina ni se reemplaza.
+- Los **duplicados están permitidos** en este escenario: si el checklist ya tiene una tarea con el mismo texto, la de la plantilla también se agrega. El frontend lo advierte antes de confirmar, pero no lo bloquea.
+- `404` si no existe el mantenimiento (`Maintenance not found`) o la plantilla (`Checklist template not found`); en ambos casos el checklist queda intacto.
+
+## checklist-templates — `/api/checklist-templates` (solo ADMIN)
+
+Listas de tareas reutilizables. **Todas** las rutas son ADMIN-only, **incluidas las de lectura**: a diferencia de los catálogos (nodos, equipos, proveedores), una plantilla solo se usa desde flujos que ya requieren ADMIN, así que un OPERATOR recibe `403` en las cinco.
+
+| Método | Ruta | Propósito |
+|---|---|---|
+| GET | `/` | Listar plantillas (ordenadas por nombre, con sus items) |
+| GET | `/:id` | Detalle de una plantilla |
+| POST | `/` | Crear plantilla **con sus tareas** en una sola llamada |
+| PUT | `/:id` | Editar nombre, descripción y **el conjunto completo** de tareas |
+| DELETE | `/:id` | Eliminar plantilla y sus items; **no afecta a tareas ya copiadas** |
+
+Payload de `POST` y `PUT`:
+
+```json
+{ "name": "Mantenimiento preventivo UPS", "description": "Opcional", "items": [ { "description": "Revisar voltaje de entrada" } ] }
+```
+
+Reglas de validación (`400` salvo donde se indique):
+
+- `name` obligatorio, con trim, no vacío y **único ignorando mayúsculas/minúsculas** (`409`): «Mantenimiento UPS» y «mantenimiento ups» colisionan.
+- `items` con **al menos una** tarea: no se puede guardar ni dejar una plantilla vacía.
+- Cada `description` obligatoria, con trim y no vacía.
+- **Sin tareas repetidas dentro de la misma plantilla** tras normalizar (minúsculas + espacios colapsados): «Revisar baterías» y « revisar  BATERÍAS » son duplicados. Los **acentos sí distinguen**: «revisión» y «revision» son tareas diferentes.
+- El `sortOrder` lo **deriva el servidor** del orden del array; no se acepta en el payload.
+
+El `PUT` es **declarativo**: el array `items` enviado es el estado final de la plantilla, no un diff.
+
+### Relación con los mantenimientos: ninguna
+
+Aplicar una plantilla **copia** sus tareas al checklist. No existe ninguna foreign key entre `ChecklistTemplate`/`ChecklistTemplateItem` y `Maintenance`/`ChecklistTask`, en ninguna dirección. Por tanto:
+
+- editar una plantilla **no** modifica los mantenimientos que ya la aplicaron;
+- eliminar una plantilla **no** elimina tareas ya copiadas;
+- cada tarea copiada es una `ChecklistTask` normal, indistinguible de una creada a mano.
 
 ## evidences — `/api/maintenances/:maintenanceId/evidences`
 

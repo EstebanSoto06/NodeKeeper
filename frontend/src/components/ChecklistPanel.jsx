@@ -4,6 +4,10 @@
    Reglas reales del backend (ver checklist-task.service.js):
    - Estructura (crear/editar/eliminar tarea): solo ADMIN, solo con el
      mantenimiento SCHEDULED (409 en otro estado).
+   - Aplicar una lista predeterminada (POST .../apply-template) es tambien
+     una modificacion estructural: mismas reglas exactas que crear una tarea
+     (solo ADMIN, solo SCHEDULED). Copia las tareas de la plantilla al final
+     del checklist SIN eliminar ni reemplazar las existentes.
    - Marcar/desmarcar (PATCH .../status con { isCompleted }): ADMIN u
      OPERATOR, solo con el mantenimiento IN_PROGRESS (409 en otro estado).
    - COMPLETED: todo de solo lectura.
@@ -17,6 +21,7 @@ import { Icon } from './Icon.jsx';
 import { EmptyState } from './EmptyState.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
+import { ApplyTemplateDialog } from './ApplyTemplateDialog.jsx';
 import { usePermissions } from '../hooks/usePermissions.js';
 import * as checklistTaskService from '../services/checklistTaskService.js';
 
@@ -29,6 +34,13 @@ export function ChecklistPanel({ maintenanceId, status, tasks, loading, onChange
   const perms = usePermissions();
   const canStructure = perms.canManageChecklistStructureFor(status);
   const canToggle = perms.canToggleChecklistFor(status);
+
+  // "Agregar tareas" despliega dos opciones antes de actuar: la manual (que
+  // conserva exactamente el flujo anterior) y la de cargar una lista
+  // predeterminada. Ambas heredan canStructure, asi que solo existen para
+  // ADMIN con el mantenimiento SCHEDULED.
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
 
   const [creating, setCreating] = useState(false);
   const [newDescription, setNewDescription] = useState('');
@@ -179,10 +191,39 @@ export function ChecklistPanel({ maintenanceId, status, tasks, loading, onChange
               <Button variant="primary" size="sm" icon="check" onClick={submitCreate} disabled={savingNew}>Agregar</Button>
               <Button variant="ghost" size="sm" onClick={() => { setCreating(false); setNewDescription(''); setCreateError(''); }} disabled={savingNew}>Cancelar</Button>
             </div>
+          ) : addMenuOpen ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="pencil"
+                onClick={() => { setAddMenuOpen(false); setCreating(true); }}
+              >
+                Agregar tarea manual
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="list"
+                onClick={() => { setAddMenuOpen(false); setApplyingTemplate(true); }}
+              >
+                Cargar lista predeterminada
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAddMenuOpen(false)}>Cancelar</Button>
+            </div>
           ) : (
-            <Button variant="secondary" size="sm" icon="plus" onClick={() => setCreating(true)}>Agregar tarea</Button>
+            <Button variant="secondary" size="sm" icon="plus" onClick={() => setAddMenuOpen(true)}>Agregar tareas</Button>
           )}
         </div>
+      )}
+
+      {applyingTemplate && (
+        <ApplyTemplateDialog
+          maintenanceId={maintenanceId}
+          existingTasks={tasks}
+          onClose={() => setApplyingTemplate(false)}
+          onApplied={onChanged}
+        />
       )}
 
       <div className="nk-card-foot">

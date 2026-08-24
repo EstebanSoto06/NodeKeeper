@@ -45,11 +45,12 @@ model User {
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
 
-  createdMaintenances     Maintenance[]   @relation("MaintenanceCreatedBy")
-  startedMaintenances     Maintenance[]   @relation("MaintenanceStartedBy")
-  closedMaintenances      Maintenance[]   @relation("MaintenanceClosedBy")
-  completedChecklistTasks ChecklistTask[] @relation("ChecklistTaskCompletedBy")
-  evidences               Evidence[]      @relation("EvidenceUploadedBy")
+  createdMaintenances     Maintenance[]        @relation("MaintenanceCreatedBy")
+  startedMaintenances     Maintenance[]        @relation("MaintenanceStartedBy")
+  closedMaintenances      Maintenance[]        @relation("MaintenanceClosedBy")
+  completedChecklistTasks ChecklistTask[]      @relation("ChecklistTaskCompletedBy")
+  evidences               Evidence[]           @relation("EvidenceUploadedBy")
+  createdChecklistTemplates ChecklistTemplate[] @relation("ChecklistTemplateCreatedBy")
 }
 
 model NetworkNode {
@@ -139,6 +140,41 @@ model ChecklistTask {
 
   maintenance    Maintenance  @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
   completedBy    User?        @relation("ChecklistTaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+}
+
+// Lista de tareas reutilizable. Deliberadamente NO tiene ninguna relacion con
+// Maintenance ni con ChecklistTask, en ninguna direccion: aplicar una
+// plantilla COPIA sus items al checklist de la orden, y a partir de ese
+// momento las tareas son ChecklistTask normales sin vinculo con su origen.
+// Esa ausencia de foreign key es lo que garantiza estructuralmente que
+// editar o eliminar una plantilla no pueda afectar a mantenimientos ya
+// creados: no existe columna que represente esa relacion.
+model ChecklistTemplate {
+  id          String                  @id @default(cuid())
+  name        String                  @unique
+  description String?
+  createdById String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  createdBy   User?                   @relation("ChecklistTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  items       ChecklistTemplateItem[]
+}
+
+// sortOrder (y no "position") por consistencia con ChecklistTask.sortOrder:
+// al aplicar la plantilla el valor se copia como un desplazamiento sobre el
+// orden ya existente, sin traducir entre dos nombres para el mismo concepto.
+model ChecklistTemplateItem {
+  id          String            @id @default(cuid())
+  templateId  String
+  description String
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  template    ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
 }
 
 model Evidence {

@@ -30,6 +30,7 @@ import { Map } from '../pages/Map.jsx';
 import { Reports } from '../pages/Reports.jsx';
 import { Users } from '../pages/Users.jsx';
 import { EvidencesInfo } from '../pages/EvidencesInfo.jsx';
+import { ChecklistTemplates } from '../pages/ChecklistTemplates.jsx';
 
 export function AppRoutes() {
   return (
@@ -53,10 +54,13 @@ export function AppRoutes() {
           <Route path="/evidencias" element={<EvidencesInfo />} />
           <Route path="/reportes" element={<Reports />} />
 
-          {/* /usuarios: solo ADMIN; OPERATOR (o navegacion directa por URL) ve
-              AccessDenied gracias a la guarda de rol. */}
+          {/* /usuarios y /plantillas: solo ADMIN; OPERATOR (o navegacion
+              directa por URL) ve AccessDenied gracias a la guarda de rol.
+              /plantillas ademas consume endpoints que el backend restringe a
+              ADMIN incluso para leer (checklist-template.routes.js). */}
           <Route element={<ProtectedRoute roles={['ADMIN']} />}>
             <Route path="/usuarios" element={<Users />} />
+            <Route path="/plantillas" element={<ChecklistTemplates />} />
           </Route>
         </Route>
       </Route>

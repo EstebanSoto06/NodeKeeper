@@ -1,5 +1,6 @@
 /* Barra lateral navy. Navegación principal + secciones por permiso de rol.
-   El Operador no ve la sección Administración (Usuarios y roles).
+   El Operador no ve la sección Administración (Usuarios y roles, Plantillas
+   de checklist).
    Los items usan NavLink (URL real, resaltado automático de la ruta activa)
    y el usuario/rol provienen de la sesión real (AuthContext). El badge de
    mantenimientos pendientes es real (GET /maintenances, conteo de
@@ -26,6 +27,7 @@ const NAV_DATA = [
 ];
 const NAV_ADMIN = [
   { to: '/usuarios', label: 'Usuarios y roles', icon: 'users' },
+  { to: '/plantillas', label: 'Plantillas de checklist', icon: 'list' },
 ];
 
 function initialsFromName(name) {

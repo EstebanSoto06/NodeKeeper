@@ -64,6 +64,17 @@ Reglas:
 - Cálculo de avance.
 - Un mantenimiento no puede cerrarse si su checklist no está completo.
 
+### Plantillas de checklist (listas de tareas predefinidas)
+
+Ampliación del alcance aprobada durante el desarrollo.
+
+- Administración de listas de tareas reutilizables (crear, editar, ordenar, eliminar), exclusiva del Administrador.
+- Aplicar una lista al crear un mantenimiento (opcional; por defecto "Sin lista de tareas").
+- Aplicar una lista a un mantenimiento ya creado, desde su checklist.
+- Las tareas se **copian**: no existe relación viva entre la plantilla y el mantenimiento. Editar o eliminar una lista no afecta a los mantenimientos que ya la aplicaron.
+
+Fuera de esta ampliación: versionado de plantillas, plantillas por nodo/equipo/tipo, sincronización automática e importación/exportación.
+
 ### Evidencias
 
 - Carga de archivos reales.

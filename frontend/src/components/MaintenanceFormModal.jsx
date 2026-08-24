@@ -21,6 +21,14 @@
    validacion previa, un select o fecha vacios solo mostraban un mensaje
    generico en ingles, nunca marcados en el campo. Ver utils/formValidation.js.
 
+   LISTA DE TAREAS (solo al crear): el campo opcional "Lista de tareas" envia
+   checklistTemplateId en el POST. El backend crea la orden y COPIA las tareas
+   de esa plantilla en UNA sola transaccion, asi que no puede quedar un
+   mantenimiento a medio poblar. Sin seleccion ("Sin lista de tareas", el
+   valor por defecto) el payload es identico al anterior a esta funcionalidad.
+   Editar una orden NO ofrece el selector: aplicar una lista a un checklist ya
+   existente se hace desde su detalle (ver ApplyTemplateDialog).
+
    PROGRAMACION RECURRENTE (solo al crear): el backend no tiene campo de
    recurrencia, asi que la opcion "serie recurrente" NO crea una entidad
    nueva: calcula N fechas (utils/recurrence.js) y hace N POST /maintenances
@@ -45,6 +53,7 @@ import { showToast } from '../store/store.js';
 import * as maintenanceService from '../services/maintenanceService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as equipmentService from '../services/equipmentService.js';
+import * as checklistTemplateService from '../services/checklistTemplateService.js';
 
 const TYPE_OPTIONS = [
   { value: 'PREVENTIVE', label: 'Preventivo' },
@@ -106,9 +115,19 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
 
   const { data: nodesData, loading: nodesLoading } = useAsync(() => networkNodeService.list(), []);
   const { data: equipData, loading: equipLoading } = useAsync(() => equipmentService.list(), []);
+  // Las plantillas solo se cargan al CREAR: en edicion no se ofrecen (aplicar
+  // una lista a una orden existente se hace desde su checklist). El error se
+  // ignora a proposito -- si GET /checklist-templates falla, el selector se
+  // degrada a "Sin lista de tareas" y el formulario sigue siendo utilizable;
+  // la creacion de mantenimientos nunca debe quedar bloqueada por esto.
+  const { data: templatesData, loading: templatesLoading } = useAsync(
+    () => (editing ? Promise.resolve(null) : checklistTemplateService.list()),
+    [editing],
+  );
   const nodes = nodesData?.networkNodes ?? [];
   const equipmentList = equipData?.equipment ?? [];
-  const optionsLoading = nodesLoading || equipLoading;
+  const templates = templatesData?.checklistTemplates ?? [];
+  const optionsLoading = nodesLoading || equipLoading || templatesLoading;
 
   const [v, setV] = useState(() =>
     maintenance
@@ -133,6 +152,12 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
+
+  // Lista de tareas: solo al crear. '' = "Sin lista de tareas" (por defecto),
+  // que reproduce EXACTAMENTE el comportamiento anterior a esta funcionalidad
+  // (el payload no lleva checklistTemplateId y la orden nace sin tareas).
+  const [checklistTemplateId, setChecklistTemplateId] = useState('');
+  const selectedTemplate = templates.find((t) => t.id === checklistTemplateId) ?? null;
 
   // Serie recurrente: solo disponible al crear (editar afecta a UNA orden).
   const [isSeries, setIsSeries] = useState(false);
@@ -193,6 +218,11 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
         scheduledDate: v.scheduledDate,
         networkNodeId: v.type === 'PREVENTIVE' ? v.networkNodeId : null,
         equipmentId: v.type === 'CORRECTIVE' ? v.equipmentId : null,
+        // Solo se incluye si el usuario eligio una lista: sin seleccion el
+        // payload es identico al de antes de esta funcionalidad. El backend
+        // lo acepta unicamente en POST (createMaintenanceSchema), nunca en
+        // PUT, y crea la orden + copia las tareas en UNA transaccion.
+        ...(!editing && checklistTemplateId ? { checklistTemplateId } : {}),
       };
       if (editing) {
         await maintenanceService.update(maintenance.id, payload);
@@ -303,6 +333,31 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
           </div>
 
           {!editing && (
+            <div className="nk-col-2">
+              <Field label="Lista de tareas" error={fieldErrors.checklistTemplateId}>
+                <Select
+                  value={checklistTemplateId}
+                  onChange={setChecklistTemplateId}
+                  error={fieldErrors.checklistTemplateId}
+                  options={[
+                    { value: '', label: 'Sin lista de tareas' },
+                    ...templates.map((t) => ({
+                      value: t.id,
+                      label: `${t.name} (${t.items?.length ?? 0} ${(t.items?.length ?? 0) === 1 ? 'tarea' : 'tareas'})`,
+                    })),
+                  ]}
+                />
+                {selectedTemplate && (
+                  <span style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2, display: 'block' }}>
+                    Se copiarán {selectedTemplate.items?.length ?? 0} tareas al checklist.
+                    Editar la lista después no cambiará este mantenimiento.
+                  </span>
+                )}
+              </Field>
+            </div>
+          )}
+
+          {!editing && (
             <div className="nk-col-2 nk-series">
               <label className="nk-check-inline">
                 <input
@@ -330,6 +385,7 @@ export function MaintenanceFormModal({ maintenance, onClose, onSaved }) {
                       Se crearán <b className="nk-mono">{seriesDates.length || seriesCount}</b> órdenes
                       {' '}<b>independientes</b>, numeradas «1/{seriesCount}», «2/{seriesCount}»…
                       El sistema no guarda la recurrencia: cada orden se edita, inicia y cierra por separado.
+                      {selectedTemplate && ' Cada orden recibe su propia copia de la lista de tareas.'}
                     </span>
                   </div>
 

@@ -129,6 +129,36 @@ export const fixtureChecklistDone = {
   completedBy: { id: fixtureOperatorUser.id, name: fixtureOperatorUser.name, email: fixtureOperatorUser.email, role: 'OPERATOR' },
 };
 
+/* Plantillas de checklist. Una plantilla NO tiene relacion con ningun
+   mantenimiento: aplicarla copia sus items como ChecklistTask normales. */
+export const fixtureTemplateUps = {
+  id: 'template-fixture-ups',
+  name: 'Mantenimiento preventivo UPS',
+  description: 'Rutina trimestral de revision de una unidad UPS.',
+  createdAt: '2026-02-01T09:00:00.000Z',
+  updatedAt: '2026-02-10T09:00:00.000Z',
+  createdBy: { id: fixtureAdminUser.id, name: fixtureAdminUser.name, email: fixtureAdminUser.email, role: 'ADMIN' },
+  items: [
+    { id: 'template-item-1', templateId: 'template-fixture-ups', description: 'Revisar voltaje de entrada', sortOrder: 0 },
+    { id: 'template-item-2', templateId: 'template-fixture-ups', description: 'Revisar baterías', sortOrder: 1 },
+    { id: 'template-item-3', templateId: 'template-fixture-ups', description: 'Tarea ficticia pendiente', sortOrder: 2 },
+  ],
+};
+
+export const fixtureTemplateNode = {
+  id: 'template-fixture-node',
+  name: 'Revisión trimestral de nodo',
+  description: null,
+  createdAt: '2026-02-02T09:00:00.000Z',
+  updatedAt: '2026-02-11T09:00:00.000Z',
+  createdBy: { id: fixtureAdminUser.id, name: fixtureAdminUser.name, email: fixtureAdminUser.email, role: 'ADMIN' },
+  items: [
+    { id: 'template-item-4', templateId: 'template-fixture-node', description: 'Verificar estado del gabinete', sortOrder: 0 },
+  ],
+};
+
+export const fixtureChecklistTemplates = [fixtureTemplateUps, fixtureTemplateNode];
+
 export const fixtureEvidenceImage = {
   id: 'evidence-fixture-1',
   maintenanceId: 'maintenance-fixture-progress',

@@ -33,6 +33,7 @@ async function loginAs(email, password) {
 
 const createdMaintenanceIds = [];
 const createdNodeIds = [];
+const createdTemplateIds = [];
 
 let adminToken;
 let operatorToken;
@@ -100,6 +101,25 @@ async function createCompletedMaintenanceWithTask() {
   return { maintenanceId, taskId: task.id };
 }
 
+// Crea una plantilla real por la API y registra su id para la limpieza.
+async function createTemplateFixture(descriptions) {
+  const response = await request(app)
+    .post("/api/checklist-templates")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      name: `Plantilla Checklist QA ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      items: descriptions.map((description) => ({ description })),
+    });
+
+  const id = response.body?.data?.checklistTemplate?.id;
+
+  if (id) {
+    createdTemplateIds.push(id);
+  }
+
+  return id;
+}
+
 async function createTaskViaApi(maintenanceId, overrides = {}) {
   const response = await request(app)
     .post(checklistUrl(maintenanceId))
@@ -137,6 +157,14 @@ afterAll(async () => {
   if (createdNodeIds.length > 0) {
     await prisma.networkNode.deleteMany({
       where: { id: { in: createdNodeIds } },
+    });
+  }
+
+  // Las plantillas se borran al final y por separado: no las referencia
+  // ningun mantenimiento, precisamente porque aplicarlas copia sus tareas.
+  if (createdTemplateIds.length > 0) {
+    await prisma.checklistTemplate.deleteMany({
+      where: { id: { in: createdTemplateIds } },
     });
   }
 });
@@ -1121,6 +1149,353 @@ describe("Checklist task routes", () => {
         where: { id: taskId },
       });
       expect(persisted.isCompleted).toBe(false);
+    });
+  });
+
+  describe("POST /apply-template", () => {
+    function applyTemplateUrl(maintenanceId) {
+      return `${checklistUrl(maintenanceId)}/apply-template`;
+    }
+
+    async function applyTemplate(maintenanceId, templateId, token = adminToken) {
+      return request(app)
+        .post(applyTemplateUrl(maintenanceId))
+        .set("Authorization", `Bearer ${token}`)
+        .send({ templateId });
+    }
+
+    it("copia todas las tareas de la plantilla a un mantenimiento SCHEDULED vacio", async () => {
+      const maintenanceId = await createScheduledMaintenance();
+      const templateId = await createTemplateFixture([
+        "Revisar voltaje de entrada",
+        "Revisar baterias",
+        "Limpiar equipo",
+      ]);
+
+      const response = await applyTemplate(maintenanceId, templateId);
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+
+      const tasks = response.body.data.checklistTasks;
+      expect(tasks).toHaveLength(3);
+      expect(tasks.map((task) => task.description)).toEqual([
+        "Revisar voltaje de entrada",
+        "Revisar baterias",
+        "Limpiar equipo",
+      ]);
+      expect(tasks.map((task) => task.sortOrder)).toEqual([0, 1, 2]);
+      // Las tareas nacen pendientes, como cualquier tarea nueva.
+      tasks.forEach((task) => {
+        expect(task.isCompleted).toBe(false);
+        expect(task.completedAt).toBeNull();
+        expect(task.completedById).toBeNull();
+      });
+    });
+
+    it("AGREGA las tareas al final sin eliminar ni alterar las existentes", async () => {
+      const maintenanceId = await createScheduledMaintenance();
+      const existing = await createTaskViaApi(maintenanceId, {
+        description: "Tarea previa del ADMIN",
+      });
+      const existingTaskId = existing.body.data.checklistTask.id;
+
+      const templateId = await createTemplateFixture(["Nueva A", "Nueva B"]);
+      const response = await applyTemplate(maintenanceId, templateId);
+
+      expect(response.status).toBe(201);
+
+      const tasks = response.body.data.checklistTasks;
+      expect(tasks).toHaveLength(3);
+      expect(tasks[0].id).toBe(existingTaskId);
+      expect(tasks[0].description).toBe("Tarea previa del ADMIN");
+      expect(tasks.map((task) => task.description)).toEqual([
+        "Tarea previa del ADMIN",
+        "Nueva A",
+        "Nueva B",
+      ]);
+    });
+
+    it("no reutiliza posiciones ya ocupadas cuando el checklist tiene huecos", async () => {
+      const maintenanceId = await createScheduledMaintenance();
+
+      // Tres tareas y se borra la del medio: quedan sortOrder 0 y 2.
+      const first = await createTaskViaApi(maintenanceId, { description: "Uno" });
+      const middle = await createTaskViaApi(maintenanceId, { description: "Dos" });
+      await request(app)
+        .put(`${checklistUrl(maintenanceId)}/${first.body.data.checklistTask.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ description: "Uno", sortOrder: 0 });
+      await request(app)
+        .put(`${checklistUrl(maintenanceId)}/${middle.body.data.checklistTask.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ description: "Dos", sortOrder: 2 });
+      await request(app)
+        .delete(`${checklistUrl(maintenanceId)}/${first.body.data.checklistTask.id}`)
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      const templateId = await createTemplateFixture(["Plantilla 1", "Plantilla 2"]);
+      const response = await applyTemplate(maintenanceId, templateId);
+
+      expect(response.status).toBe(201);
+
+      const sortOrders = response.body.data.checklistTasks.map((t) => t.sortOrder);
+      // Ninguna posicion repetida: el bloque entrante arranca en MAX+1.
+      expect(new Set(sortOrders).size).toBe(sortOrders.length);
+      expect(sortOrders).toEqual([2, 3, 4]);
+    });
+
+    it("PERMITE duplicados contra tareas que ya existen en el checklist", async () => {
+      const maintenanceId = await createScheduledMaintenance();
+      await createTaskViaApi(maintenanceId, { description: "Limpiar equipo" });
+
+      const templateId = await createTemplateFixture([
+        "Limpiar equipo",
+        "Verificar alarmas",
+      ]);
+      const response = await applyTemplate(maintenanceId, templateId);
+
+      expect(response.status).toBe(201);
+
+      const descriptions = response.body.data.checklistTasks.map((t) => t.description);
+      expect(descriptions).toEqual([
+        "Limpiar equipo",
+        "Limpiar equipo",
+        "Verificar alarmas",
+      ]);
+    });
+
+    it("permite aplicar la misma plantilla dos veces y aplicar dos plantillas distintas", async () => {
+      const maintenanceId = await createScheduledMaintenance();
+      const templateA = await createTemplateFixture(["A1", "A2"]);
+      const templateB = await createTemplateFixture(["B1"]);
+
+      await applyTemplate(maintenanceId, templateA);
+      await applyTemplate(maintenanceId, templateA);
+      const response = await applyTemplate(maintenanceId, templateB);
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.checklistTasks.map((t) => t.description)).toEqual([
+        "A1",
+        "A2",
+        "A1",
+        "A2",
+        "B1",
+      ]);
+    });
+
+    describe("independencia de la copia", () => {
+      it("editar la plantilla despues de aplicarla NO cambia las tareas copiadas", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Texto original"]);
+        await applyTemplate(maintenanceId, templateId);
+
+        const updateResponse = await request(app)
+          .put(`/api/checklist-templates/${templateId}`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({
+            name: `Renombrada ${Date.now()}-${Math.random()}`,
+            items: [{ description: "Texto MODIFICADO" }],
+          });
+        expect(updateResponse.status).toBe(200);
+
+        const tasks = await prisma.checklistTask.findMany({ where: { maintenanceId } });
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].description).toBe("Texto original");
+      });
+
+      it("eliminar la plantilla despues de aplicarla NO elimina las tareas copiadas", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Tarea A", "Tarea B"]);
+        await applyTemplate(maintenanceId, templateId);
+
+        const deleteResponse = await request(app)
+          .delete(`/api/checklist-templates/${templateId}`)
+          .set("Authorization", `Bearer ${adminToken}`);
+        expect(deleteResponse.status).toBe(200);
+
+        const tasks = await prisma.checklistTask.findMany({ where: { maintenanceId } });
+        expect(tasks).toHaveLength(2);
+        expect(tasks.map((t) => t.description).sort()).toEqual(["Tarea A", "Tarea B"]);
+      });
+
+      it("editar una tarea copiada NO modifica la plantilla de origen", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Texto de la plantilla"]);
+        const applied = await applyTemplate(maintenanceId, templateId);
+        const taskId = applied.body.data.checklistTasks[0].id;
+
+        await request(app)
+          .put(`${checklistUrl(maintenanceId)}/${taskId}`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ description: "Texto cambiado en el checklist", sortOrder: 0 });
+
+        const items = await prisma.checklistTemplateItem.findMany({
+          where: { templateId },
+        });
+        expect(items).toHaveLength(1);
+        expect(items[0].description).toBe("Texto de la plantilla");
+      });
+
+      it("eliminar el mantenimiento NO elimina la plantilla", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Tarea"]);
+        await applyTemplate(maintenanceId, templateId);
+
+        await request(app)
+          .delete(`/api/maintenances/${maintenanceId}`)
+          .set("Authorization", `Bearer ${adminToken}`);
+
+        const template = await prisma.checklistTemplate.findUnique({
+          where: { id: templateId },
+        });
+        expect(template).not.toBeNull();
+      });
+    });
+
+    describe("estado del mantenimiento", () => {
+      it("rechaza con 409 sobre un mantenimiento IN_PROGRESS, sin insertar nada", async () => {
+        const maintenanceId = await createInProgressMaintenance();
+        const templateId = await createTemplateFixture(["Tarea A", "Tarea B"]);
+
+        const response = await applyTemplate(maintenanceId, templateId);
+
+        expect(response.status).toBe(409);
+        expect(response.body.message).toMatch(/scheduled/i);
+
+        const count = await prisma.checklistTask.count({ where: { maintenanceId } });
+        expect(count).toBe(0);
+      });
+
+      it("rechaza con 409 sobre un mantenimiento COMPLETED, sin insertar nada", async () => {
+        const { maintenanceId } = await createCompletedMaintenanceWithTask();
+        const templateId = await createTemplateFixture(["Tarea A", "Tarea B"]);
+
+        const before = await prisma.checklistTask.count({ where: { maintenanceId } });
+        const response = await applyTemplate(maintenanceId, templateId);
+
+        expect(response.status).toBe(409);
+
+        const after = await prisma.checklistTask.count({ where: { maintenanceId } });
+        expect(after).toBe(before);
+      });
+
+      it("rechaza con 409 sobre un mantenimiento CANCELLED, sin insertar nada", async () => {
+        // CANCELLED no tiene endpoint que lo produzca (ver
+        // utils/maintenanceState.js), asi que se fija directamente en base de
+        // datos para poder cubrir la rama del enum.
+        const maintenanceId = await createScheduledMaintenance();
+        await prisma.maintenance.update({
+          where: { id: maintenanceId },
+          data: { status: "CANCELLED" },
+        });
+        const templateId = await createTemplateFixture(["Tarea A"]);
+
+        const response = await applyTemplate(maintenanceId, templateId);
+
+        expect(response.status).toBe(409);
+
+        const count = await prisma.checklistTask.count({ where: { maintenanceId } });
+        expect(count).toBe(0);
+      });
+    });
+
+    describe("autorizacion y errores", () => {
+      it("rechaza con 401 sin token y con 403 a un OPERATOR", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Tarea"]);
+
+        const anonymous = await request(app)
+          .post(applyTemplateUrl(maintenanceId))
+          .send({ templateId });
+        expect(anonymous.status).toBe(401);
+
+        const operator = await applyTemplate(maintenanceId, templateId, operatorToken);
+        expect(operator.status).toBe(403);
+
+        const count = await prisma.checklistTask.count({ where: { maintenanceId } });
+        expect(count).toBe(0);
+      });
+
+      it("devuelve 404 si el mantenimiento no existe", async () => {
+        const templateId = await createTemplateFixture(["Tarea"]);
+
+        const response = await applyTemplate("mantenimiento-inexistente", templateId);
+
+        expect(response.status).toBe(404);
+        expect(response.body.message).toMatch(/maintenance not found/i);
+      });
+
+      it("devuelve 404 si la plantilla no existe, sin tocar el checklist", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        await createTaskViaApi(maintenanceId, { description: "Tarea previa" });
+
+        const response = await applyTemplate(maintenanceId, "plantilla-inexistente");
+
+        expect(response.status).toBe(404);
+        expect(response.body.message).toMatch(/checklist template not found/i);
+
+        // Rollback: el checklist queda exactamente como estaba.
+        const tasks = await prisma.checklistTask.findMany({ where: { maintenanceId } });
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].description).toBe("Tarea previa");
+      });
+
+      it("devuelve 409 si la plantilla se quedo sin tareas, sin insertar nada", async () => {
+        // La API impide crear o dejar una plantilla vacia (minimo un item),
+        // asi que este estado solo se alcanza manipulando la base de datos.
+        // La rama defensiva existe igualmente y se cubre aqui.
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Tarea unica"]);
+        await prisma.checklistTemplateItem.deleteMany({ where: { templateId } });
+
+        const response = await applyTemplate(maintenanceId, templateId);
+
+        expect(response.status).toBe(409);
+        expect(response.body.message).toMatch(/no tasks/i);
+
+        const count = await prisma.checklistTask.count({ where: { maintenanceId } });
+        expect(count).toBe(0);
+      });
+
+      it("rechaza con 400 un cuerpo sin templateId o con campos desconocidos", async () => {
+        const maintenanceId = await createScheduledMaintenance();
+        const templateId = await createTemplateFixture(["Tarea"]);
+
+        const [missing, blank, extra] = await Promise.all([
+          request(app)
+            .post(applyTemplateUrl(maintenanceId))
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({}),
+          request(app)
+            .post(applyTemplateUrl(maintenanceId))
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ templateId: "   " }),
+          request(app)
+            .post(applyTemplateUrl(maintenanceId))
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ templateId, descriptions: ["tarea inyectada"] }),
+        ]);
+
+        expect(missing.status).toBe(400);
+        expect(blank.status).toBe(400);
+        expect(extra.status).toBe(400);
+
+        const count = await prisma.checklistTask.count({ where: { maintenanceId } });
+        expect(count).toBe(0);
+      });
+    });
+
+    it("las tareas aplicadas cuentan como pendientes y bloquean el cierre", async () => {
+      const maintenanceId = await createScheduledMaintenance();
+      const templateId = await createTemplateFixture(["Tarea A", "Tarea B"]);
+      await applyTemplate(maintenanceId, templateId);
+
+      await startMaintenance(maintenanceId);
+      const response = await completeMaintenance(maintenanceId);
+
+      expect(response.status).toBe(409);
+      expect(response.body.message).toMatch(/checklist must be completed/i);
     });
   });
 });

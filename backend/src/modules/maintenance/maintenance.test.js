@@ -31,6 +31,7 @@ async function loginAs(email, password) {
 const createdMaintenanceIds = [];
 const createdEquipmentIds = [];
 const createdNodeIds = [];
+const createdTemplateIds = [];
 
 let adminToken;
 let operatorToken;
@@ -56,6 +57,24 @@ async function createPreventiveMaintenance(overrides = {}) {
   }
 
   return response;
+}
+
+async function createTemplateFixture(descriptions) {
+  const response = await request(app)
+    .post("/api/checklist-templates")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      name: `Plantilla Mantenimiento QA ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      items: descriptions.map((description) => ({ description })),
+    });
+
+  const id = response.body?.data?.checklistTemplate?.id;
+
+  if (id) {
+    createdTemplateIds.push(id);
+  }
+
+  return id;
 }
 
 beforeAll(async () => {
@@ -105,6 +124,12 @@ afterAll(async () => {
   if (createdNodeIds.length > 0) {
     await prisma.networkNode.deleteMany({
       where: { id: { in: createdNodeIds } },
+    });
+  }
+
+  if (createdTemplateIds.length > 0) {
+    await prisma.checklistTemplate.deleteMany({
+      where: { id: { in: createdTemplateIds } },
     });
   }
 });
@@ -740,5 +765,208 @@ describe("Maintenance routes", () => {
     expect(after.body.data.maintenance.type).toBe("PREVENTIVE");
     expect(after.body.data.maintenance.networkNodeId).toBe(networkNodeId);
     expect(after.body.data.maintenance.equipmentId).toBeNull();
+  });
+});
+
+describe("Maintenance creation with a checklist template", () => {
+  it("sin checklistTemplateId crea la orden sin tareas (comportamiento actual)", async () => {
+    const response = await createPreventiveMaintenance();
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.maintenance.checklistTasks).toEqual([]);
+  });
+
+  it("con checklistTemplateId null se comporta igual que sin el campo", async () => {
+    const response = await createPreventiveMaintenance({ checklistTemplateId: null });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.maintenance.checklistTasks).toEqual([]);
+  });
+
+  it("con una plantilla valida devuelve la orden ya con sus tareas copiadas", async () => {
+    const templateId = await createTemplateFixture([
+      "Revisar voltaje de entrada",
+      "Revisar baterias",
+      "Registrar lectura final",
+    ]);
+
+    const response = await createPreventiveMaintenance({
+      checklistTemplateId: templateId,
+    });
+
+    expect(response.status).toBe(201);
+
+    const tasks = response.body.data.maintenance.checklistTasks;
+    expect(tasks).toHaveLength(3);
+    expect(tasks.map((task) => task.description)).toEqual([
+      "Revisar voltaje de entrada",
+      "Revisar baterias",
+      "Registrar lectura final",
+    ]);
+    expect(tasks.map((task) => task.sortOrder)).toEqual([0, 1, 2]);
+    tasks.forEach((task) => expect(task.isCompleted).toBe(false));
+  });
+
+  it("funciona igual en un mantenimiento CORRECTIVO: la plantilla es agnostica al tipo", async () => {
+    const templateId = await createTemplateFixture(["Diagnosticar falla"]);
+
+    const response = await createPreventiveMaintenance({
+      type: "CORRECTIVE",
+      networkNodeId: null,
+      equipmentId,
+      checklistTemplateId: templateId,
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.maintenance.checklistTasks).toHaveLength(1);
+  });
+
+  it("las tareas copiadas son independientes: editar la plantilla no las cambia", async () => {
+    const templateId = await createTemplateFixture(["Texto original"]);
+    const created = await createPreventiveMaintenance({
+      checklistTemplateId: templateId,
+    });
+    const maintenanceId = created.body.data.maintenance.id;
+
+    await request(app)
+      .put(`/api/checklist-templates/${templateId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: `Renombrada ${Date.now()}-${Math.random()}`,
+        items: [{ description: "Texto MODIFICADO" }],
+      });
+
+    const tasks = await prisma.checklistTask.findMany({ where: { maintenanceId } });
+    expect(tasks[0].description).toBe("Texto original");
+  });
+
+  describe("atomicidad", () => {
+    it("con una plantilla inexistente devuelve 404 y NO crea el mantenimiento", async () => {
+      const title = `Rollback Plantilla QA ${Date.now()}-${Math.random()}`;
+
+      const response = await request(app)
+        .post("/api/maintenances")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          title,
+          type: "PREVENTIVE",
+          networkNodeId,
+          checklistTemplateId: "plantilla-inexistente",
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toMatch(/checklist template not found/i);
+
+      // Rollback verificado directamente en base de datos.
+      const orphan = await prisma.maintenance.findFirst({ where: { title } });
+      expect(orphan).toBeNull();
+    });
+
+    it("con un nodo inexistente devuelve 404 y no deja ni orden ni tareas", async () => {
+      const title = `Rollback Nodo QA ${Date.now()}-${Math.random()}`;
+      const templateId = await createTemplateFixture(["Tarea A", "Tarea B"]);
+
+      const response = await request(app)
+        .post("/api/maintenances")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          title,
+          type: "PREVENTIVE",
+          networkNodeId: "nodo-inexistente",
+          checklistTemplateId: templateId,
+        });
+
+      expect(response.status).toBe(404);
+
+      const orphan = await prisma.maintenance.findFirst({ where: { title } });
+      expect(orphan).toBeNull();
+    });
+  });
+
+  describe("autorizacion y validacion", () => {
+    it("un OPERATOR no puede crear un mantenimiento ni con plantilla ni sin ella", async () => {
+      const templateId = await createTemplateFixture(["Tarea"]);
+      const title = `Operator Plantilla QA ${Date.now()}-${Math.random()}`;
+
+      const response = await request(app)
+        .post("/api/maintenances")
+        .set("Authorization", `Bearer ${operatorToken}`)
+        .send({
+          title,
+          type: "PREVENTIVE",
+          networkNodeId,
+          checklistTemplateId: templateId,
+        });
+
+      expect(response.status).toBe(403);
+
+      const orphan = await prisma.maintenance.findFirst({ where: { title } });
+      expect(orphan).toBeNull();
+    });
+
+    it("PUT /maintenances/:id NO aplica plantillas aunque se envie checklistTemplateId", async () => {
+      const templateId = await createTemplateFixture(["Tarea que no debe aparecer"]);
+      const created = await createPreventiveMaintenance();
+      const maintenanceId = created.body.data.maintenance.id;
+
+      const response = await request(app)
+        .put(`/api/maintenances/${maintenanceId}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          title: "Titulo actualizado",
+          type: "PREVENTIVE",
+          networkNodeId,
+          checklistTemplateId: templateId,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.maintenance.checklistTasks).toEqual([]);
+
+      const count = await prisma.checklistTask.count({ where: { maintenanceId } });
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("recurrencia", () => {
+    it("cada orden de una serie recibe su PROPIA copia independiente", async () => {
+      // La recurrencia del frontend son N POST /maintenances independientes
+      // con el mismo payload base (ver utils/recurrence.js): aqui se
+      // reproduce ese comportamiento contra la API real.
+      const templateId = await createTemplateFixture(["Tarea A", "Tarea B"]);
+      const dates = ["2026-09-01", "2026-10-01", "2026-11-01"];
+
+      const responses = [];
+      for (const scheduledDate of dates) {
+        // eslint-disable-next-line no-await-in-loop
+        const response = await createPreventiveMaintenance({
+          title: `Serie QA ${Date.now()}-${Math.random()} ${scheduledDate}`,
+          scheduledDate,
+          checklistTemplateId: templateId,
+        });
+        responses.push(response);
+      }
+
+      responses.forEach((response) => {
+        expect(response.status).toBe(201);
+        expect(response.body.data.maintenance.checklistTasks).toHaveLength(2);
+      });
+
+      // Las tareas de cada orden son filas distintas: ningun id se repite
+      // entre ordenes, y ninguna apunta a la plantilla.
+      const allTaskIds = responses.flatMap((response) =>
+        response.body.data.maintenance.checklistTasks.map((task) => task.id),
+      );
+      expect(new Set(allTaskIds).size).toBe(6);
+
+      // Eliminar la plantilla no afecta a ninguna de las tres ordenes.
+      await request(app)
+        .delete(`/api/checklist-templates/${templateId}`)
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      const survivingTasks = await prisma.checklistTask.findMany({
+        where: { id: { in: allTaskIds } },
+      });
+      expect(survivingTasks).toHaveLength(6);
+    });
   });
 });

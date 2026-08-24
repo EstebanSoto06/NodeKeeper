@@ -114,6 +114,78 @@ export async function deleteChecklistTask(maintenanceId, taskId) {
   });
 }
 
+// Aplicar una plantilla es una modificacion ESTRUCTURAL del checklist, no
+// una operacion nueva con reglas propias: reutiliza exactamente la misma
+// autorizacion (solo ADMIN, en la ruta), el mismo estado exigido (SCHEDULED)
+// y el mismo mensaje de conflicto que createChecklistTask. Aplicarla no
+// puede permitir nada que crear una tarea a mano no permitiera ya.
+//
+// Corre en runSerializableTransaction por el mismo motivo que el resto del
+// modulo: LEE Maintenance.status y luego ESCRIBE ChecklistTask, mientras
+// completeMaintenance LEE ChecklistTask y ESCRIBE Maintenance. Ese ciclo
+// cruzado solo lo detecta PostgreSQL si ambos lados corren en Serializable.
+export async function applyChecklistTemplate(maintenanceId, templateId) {
+  return runSerializableTransaction(async (tx) => {
+    const maintenance = await getMaintenanceOrThrow(tx, maintenanceId);
+
+    assertMaintenanceStatus(
+      maintenance,
+      "SCHEDULED",
+      "created while the maintenance is scheduled",
+    );
+
+    const template = await tx.checklistTemplate.findUnique({
+      where: { id: templateId },
+      include: {
+        items: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    });
+
+    if (!template) {
+      throw createHttpError(404, "Checklist template not found");
+    }
+
+    if (template.items.length === 0) {
+      throw createHttpError(409, "The checklist template has no tasks");
+    }
+
+    // Las tareas de la plantilla se AGREGAN al final del checklist: las
+    // existentes no se leen para compararlas ni se tocan de ninguna forma.
+    // Se parte de MAX(sortOrder)+1 y no de un conteo de filas porque el
+    // ADMIN pudo borrar tareas intermedias, dejando huecos: contar daria
+    // posiciones ya ocupadas y el bloque entrante se intercalaria con las
+    // que ya estaban.
+    const { _max } = await tx.checklistTask.aggregate({
+      where: { maintenanceId },
+      _max: { sortOrder: true },
+    });
+    const baseSortOrder = (_max.sortOrder ?? -1) + 1;
+
+    // Copia POR VALOR: solo viaja la descripcion. No se copia el id del
+    // item, ni el templateId, ni ninguna referencia, de modo que la tarea
+    // resultante es indistinguible de una creada a mano. isCompleted,
+    // completedAt y completedById quedan en sus valores por defecto: las
+    // tareas nacen pendientes.
+    await tx.checklistTask.createMany({
+      data: template.items.map((item, index) => ({
+        maintenanceId,
+        description: item.description,
+        sortOrder: baseSortOrder + index,
+      })),
+    });
+
+    // Se devuelve el checklist COMPLETO (no solo lo insertado) para que el
+    // cliente pueda refrescar la vista sin una segunda peticion.
+    return tx.checklistTask.findMany({
+      where: { maintenanceId },
+      include: { completedBy: completedByInclude },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+  });
+}
+
 export async function setChecklistTaskStatus(
   maintenanceId,
   taskId,

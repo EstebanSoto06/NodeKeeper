@@ -11,6 +11,7 @@
    - Iniciar/completar mantenimiento: ADMIN y OPERATOR.
    - Checklist: crear/editar/eliminar solo ADMIN; cambiar estado ADMIN y
      OPERATOR.
+   - Plantillas de checklist: TODO solo ADMIN, incluida la lectura.
    - Evidencias: listar/subir/descargar ADMIN y OPERATOR; eliminar solo ADMIN.
      Ademas, subir/eliminar requiere que el mantenimiento este IN_PROGRESS. */
 import { useMemo } from 'react';
@@ -51,6 +52,13 @@ export function usePermissions() {
       // Checklist
       canEditChecklist: isAdmin,
       canToggleChecklist: isAuthenticated,
+
+      /* Plantillas de checklist: TODAS sus rutas son ADMIN-only en el
+         backend, incluidas las de lectura (checklist-template.routes.js), a
+         diferencia de los catalogos, que si son consultables por OPERATOR.
+         Este flag gobierna tanto la pantalla de administracion como el
+         selector de plantillas y la opcion "Cargar lista predeterminada". */
+      canManageChecklistTemplates: isAdmin,
 
       // Evidencias
       canUploadEvidence: isAuthenticated,
