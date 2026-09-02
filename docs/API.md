@@ -77,16 +77,48 @@ Error:
 | PUT | `/:id` | ADMIN | Editar; serie duplicada responde 409 |
 | DELETE | `/:id` | ADMIN | Eliminar; responde 409 si el equipo tiene historial de mantenimiento (historial preservado, ver ARCHITECTURE.md) |
 
+### `MAINTENANCE` es un estado automático (nodos y equipos)
+
+`MAINTENANCE` **no es asignable manualmente** en ninguno de los dos enums: lo escribe únicamente el ciclo de vida de una orden (`/start` lo pone, `/complete` lo retira). `POST` y `PUT` de nodos y equipos aplican estas reglas y responden `409` al violarlas:
+
+| Estado enviado | Resultado |
+|---|---|
+| `MAINTENANCE` en un recurso que **no** lo tiene | `409` — solo lo asigna el sistema |
+| `MAINTENANCE` en un recurso que **ya** lo tiene | Permitido: es conservar el estado actual, no asignarlo. Es lo que hace cualquier edición de nombre, ubicación, categoría o proveedor de un recurso en mantenimiento |
+| `AVAILABLE`/`OPERATIONAL` con una orden `IN_PROGRESS` que afecta al recurso | `409` — la única salida de `MAINTENANCE` es completar esa orden |
+| `AVAILABLE`/`OPERATIONAL` sin orden activa | Permitido |
+| `OUT_OF_SERVICE` | **Siempre permitido**, incluso durante una orden en ejecución: tiene prioridad sobre `MAINTENANCE` y ninguna escritura automática lo revierte |
+
+Omitir `status` en el `PUT` deja el estado sin tocar, que es lo que hacen los formularios cuando el recurso está bajo el estado automático. Sobre un recurso en `MAINTENANCE` esos formularios no muestran un select, sino el estado marcado como *(Automático)* más una acción explícita **«Marcar fuera de servicio»** —la única transición manual que el backend admite en ese momento—, que viaja en el mismo `PUT` al guardar.
+
 ## maintenances — `/api/maintenances`
 
 | Método | Ruta | Rol | Propósito |
 |---|---|---|---|
 | GET | `/`, `/:id` | ADMIN, OPERATOR | Listar / detalle (incluye checklist y evidencias) |
 | POST | `/` | ADMIN | Crear preventivo (`networkNodeId`) o correctivo (`equipmentId`); acepta `checklistTemplateId` opcional |
-| PUT | `/:id` | ADMIN | Editar datos generales (**no** acepta `checklistTemplateId`) |
-| DELETE | `/:id` | ADMIN | Eliminar |
-| POST | `/:id/start` | ADMIN, OPERATOR | SCHEDULED → IN_PROGRESS |
-| POST | `/:id/complete` | ADMIN, OPERATOR | IN_PROGRESS → COMPLETED; 409/400 si el checklist no está al 100% |
+| PUT | `/:id` | ADMIN | Editar datos generales (**no** acepta `checklistTemplateId`); en una orden `IN_PROGRESS` no se pueden cambiar `type`, `networkNodeId` ni `equipmentId` (409) |
+| DELETE | `/:id` | ADMIN | Eliminar; responde `409` si la orden está `IN_PROGRESS` |
+| POST | `/:id/start` | ADMIN, OPERATOR | SCHEDULED → IN_PROGRESS; además pone en `MAINTENANCE` el nodo/equipos afectados (ver abajo) |
+| POST | `/:id/complete` | ADMIN, OPERATOR | IN_PROGRESS → COMPLETED; 409/400 si el checklist no está al 100%; libera el nodo/equipos afectados (ver abajo) |
+
+### Estado del nodo y de los equipos durante un mantenimiento
+
+Iniciar y completar una orden **sincroniza el estado de los recursos afectados dentro de la misma transacción** que la transición de la orden: no puede quedar un mantenimiento en ejecución con su nodo marcado como disponible, ni al revés.
+
+| Tipo | Al iniciar (`/start`) | Al completar (`/complete`) |
+|---|---|---|
+| `PREVENTIVE` (`networkNodeId`) | Nodo → `MAINTENANCE` y **todos** sus equipos → `MAINTENANCE` | Equipos → `OPERATIONAL` y nodo → `AVAILABLE` |
+| `CORRECTIVE` (`equipmentId`) | Equipo → `MAINTENANCE` y su nodo padre → `MAINTENANCE`; los **demás equipos del nodo no cambian** | Equipo → `OPERATIONAL` y nodo padre → `AVAILABLE` |
+
+Dos reglas acotan la liberación:
+
+- **Mientras quede otra orden `IN_PROGRESS` que afecte al recurso, este no se libera.** Un nodo lo ocupan tanto los preventivos propios como los correctivos de cualquiera de sus equipos; un equipo lo ocupan sus correctivos y los preventivos de su nodo. Solo el cierre de la última orden activa devuelve el recurso a `AVAILABLE`/`OPERATIONAL`.
+- **`OUT_OF_SERVICE` nunca se sobrescribe.** Las escrituras automáticas solo aplican `AVAILABLE`/`OPERATIONAL` → `MAINTENANCE` al iniciar y `MAINTENANCE` → `AVAILABLE`/`OPERATIONAL` al completar. Un recurso fuera de servicio (estado que solo se registra a mano con `PUT /network-nodes/:id` o `PUT /equipment/:id`) queda intacto en ambas direcciones, incluso si se marca así mientras la orden está en ejecución.
+
+El cliente no necesita lógica adicional: la respuesta de `/start` y `/complete` ya incluye `networkNode`/`equipment` con su estado nuevo, y `GET /network-nodes`, `GET /network-nodes/map` y `GET /equipment` devuelven siempre el estado real.
+
+Como esa sincronización solo entra y sale por `/start` y `/complete`, una orden `IN_PROGRESS` queda **anclada a su recurso**: no puede reasignarse a otro nodo o equipo (dejaría el anterior en `MAINTENANCE` para siempre) ni eliminarse (nadie liberaría sus recursos). Ambos casos responden `409`; completar la orden es la vía normal, y después ya puede eliminarse. Ver también «`MAINTENANCE` es un estado automático» más arriba.
 
 ### Crear con una lista de tareas predefinida
 

@@ -161,6 +161,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Una orden IN_PROGRESS no puede eliminarse (ver deleteMaintenance): las
+  // que quedaron en ejecucion se cancelan antes de limpiar.
+  if (createdMaintenanceIds.length > 0) {
+    await prisma.maintenance.updateMany({
+      where: { id: { in: createdMaintenanceIds }, status: "IN_PROGRESS" },
+      data: { status: "CANCELLED" },
+    });
+  }
+
   for (const maintenanceId of createdMaintenanceIds) {
     await request(app)
       .delete(`/api/maintenances/${maintenanceId}`)
@@ -955,6 +964,13 @@ describe("Evidence routes", () => {
       });
       const storedName = persisted.storedName;
 
+      // Las evidencias solo se suben con la orden IN_PROGRESS, y una orden
+      // IN_PROGRESS ya no puede eliminarse (dejaria su nodo/equipos en
+      // MAINTENANCE sin nadie que los liberase, ver deleteMaintenance). El
+      // flujo real es cerrarla primero; lo que la prueba verifica -que el
+      // borrado arrastra la fila y el archivo fisico- no cambia.
+      await completeMaintenanceReq(maintenanceId);
+
       const response = await request(app)
         .delete(`/api/maintenances/${maintenanceId}`)
         .set("Authorization", `Bearer ${adminToken}`);
@@ -986,6 +1002,8 @@ describe("Evidence routes", () => {
         storedNames.push(persisted.storedName);
       }
 
+      await completeMaintenanceReq(maintenanceId);
+
       const response = await request(app)
         .delete(`/api/maintenances/${maintenanceId}`)
         .set("Authorization", `Bearer ${adminToken}`);
@@ -1006,6 +1024,7 @@ describe("Evidence routes", () => {
     it("deletes the maintenance even if a physical file is already missing", async () => {
       const maintenanceId = await createInProgressMaintenance();
       await directlyCreateEvidence(maintenanceId);
+      await completeMaintenanceReq(maintenanceId);
 
       const response = await request(app)
         .delete(`/api/maintenances/${maintenanceId}`)
@@ -1030,6 +1049,8 @@ describe("Evidence routes", () => {
 
       const filesBefore = await listEvidenceDirFiles();
       expect(filesBefore).toContain(storedName);
+
+      await completeMaintenanceReq(maintenanceId);
 
       await request(app)
         .delete(`/api/maintenances/${maintenanceId}`)

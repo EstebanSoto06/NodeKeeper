@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NodeFormModal } from './NodeFormModal.jsx';
 import { makeApiError } from '../test/test-utils.jsx';
+import { fixtureNodeAvailable, fixtureNodeMaintenance } from '../test/fixtures.js';
 
 vi.mock('../services/networkNodeService.js', () => ({
   create: vi.fn(),
@@ -89,5 +90,140 @@ describe('NodeFormModal', () => {
       longitude: -84.5,
     }));
     expect(onSaved).toHaveBeenCalledWith(createdNode);
+  });
+});
+
+describe('NodeFormModal — MAINTENANCE es un estado automatico', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('el select de Estado ofrece solo los estados manuales, sin "En mantenimiento"', () => {
+    render(<NodeFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByText('Disponible')).toBeInTheDocument();
+    expect(screen.getByText('Fuera de servicio')).toBeInTheDocument();
+    // Lo asigna el backend al iniciar un mantenimiento; ofrecerlo aqui solo
+    // produciria un 409.
+    expect(screen.queryByText('En mantenimiento')).not.toBeInTheDocument();
+  });
+
+  it('editando un nodo en mantenimiento lo muestra de solo lectura, sin select de Estado', () => {
+    render(<NodeFormModal node={fixtureNodeMaintenance} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByText('En mantenimiento')).toBeInTheDocument();
+    expect(screen.getByText('(Automático)')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Estado automático: el nodo tiene un mantenimiento en ejecución/),
+    ).toBeInTheDocument();
+    // Ya no hay opciones seleccionables de estado.
+    expect(screen.queryByText('Disponible')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fuera de servicio')).not.toBeInTheDocument();
+  });
+
+  it('editar otros campos de un nodo en mantenimiento NO envia el campo status', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockResolvedValueOnce({ networkNode: fixtureNodeMaintenance });
+
+    render(<NodeFormModal node={fixtureNodeMaintenance} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    const nameInput = screen.getByPlaceholderText('Subestación San Isidro');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Nodo renombrado en mantenimiento');
+    await user.click(screen.getByText('Guardar nodo'));
+
+    await waitFor(() =>
+      expect(networkNodeService.update).toHaveBeenCalledWith(fixtureNodeMaintenance.id, {
+        code: fixtureNodeMaintenance.code,
+        name: 'Nodo renombrado en mantenimiento',
+        location: fixtureNodeMaintenance.location,
+      }),
+    );
+  });
+
+  it('editando un nodo con estado manual el select sigue disponible y el status viaja', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockResolvedValueOnce({ networkNode: fixtureNodeAvailable });
+
+    render(<NodeFormModal node={fixtureNodeAvailable} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await user.selectOptions(screen.getByDisplayValue('Disponible'), 'OUT_OF_SERVICE');
+    await user.click(screen.getByText('Guardar nodo'));
+
+    await waitFor(() =>
+      expect(networkNodeService.update).toHaveBeenCalledWith(fixtureNodeAvailable.id, {
+        code: fixtureNodeAvailable.code,
+        name: fixtureNodeAvailable.name,
+        location: fixtureNodeAvailable.location,
+        status: 'OUT_OF_SERVICE',
+      }),
+    );
+  });
+});
+
+describe('NodeFormModal — marcar fuera de servicio durante un mantenimiento', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('ofrece la accion "Marcar fuera de servicio" sobre un nodo en mantenimiento', () => {
+    render(<NodeFormModal node={fixtureNodeMaintenance} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByText('Marcar fuera de servicio')).toBeInTheDocument();
+  });
+
+  it('al usarla muestra el estado pendiente y sigue sin ofrecer "Disponible"', async () => {
+    const user = userEvent.setup();
+    render(<NodeFormModal node={fixtureNodeMaintenance} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await user.click(screen.getByText('Marcar fuera de servicio'));
+
+    expect(screen.getByText('Fuera de servicio')).toBeInTheDocument();
+    expect(screen.getByText('(se aplicará al guardar)')).toBeInTheDocument();
+    // La regla no se relaja por haber marcado el recurso: volver a
+    // AVAILABLE sigue sin existir como opcion mientras la orden este activa.
+    expect(screen.queryByText('Disponible')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('guardar despues de marcarlo envia status OUT_OF_SERVICE', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockResolvedValueOnce({ networkNode: fixtureNodeMaintenance });
+
+    render(<NodeFormModal node={fixtureNodeMaintenance} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await user.click(screen.getByText('Marcar fuera de servicio'));
+    await user.click(screen.getByText('Guardar nodo'));
+
+    await waitFor(() =>
+      expect(networkNodeService.update).toHaveBeenCalledWith(fixtureNodeMaintenance.id, {
+        code: fixtureNodeMaintenance.code,
+        name: fixtureNodeMaintenance.name,
+        location: fixtureNodeMaintenance.location,
+        status: 'OUT_OF_SERVICE',
+      }),
+    );
+  });
+
+  it('la accion es reversible mientras no se guarde: vuelve a omitir status', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockResolvedValueOnce({ networkNode: fixtureNodeMaintenance });
+
+    render(<NodeFormModal node={fixtureNodeMaintenance} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await user.click(screen.getByText('Marcar fuera de servicio'));
+    await user.click(screen.getByText('Mantener estado automático'));
+
+    expect(screen.getByText('En mantenimiento')).toBeInTheDocument();
+
+    await user.click(screen.getByText('Guardar nodo'));
+
+    await waitFor(() =>
+      expect(networkNodeService.update).toHaveBeenCalledWith(fixtureNodeMaintenance.id, {
+        code: fixtureNodeMaintenance.code,
+        name: fixtureNodeMaintenance.name,
+        location: fixtureNodeMaintenance.location,
+      }),
+    );
   });
 });

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
+import { AutomaticStatusField } from './AutomaticStatusField.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { useAsync } from '../hooks/useAsync.js';
 import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
@@ -13,11 +14,16 @@ import * as equipmentService from '../services/equipmentService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as supportProviderService from '../services/supportProviderService.js';
 
+/* "En mantenimiento" NO esta entre las opciones: es un estado AUTOMATICO que
+   escribe el backend al iniciar un mantenimiento y retira al completarlo (ver
+   maintenance.service.js). PUT /equipment/:id rechaza con 409 cualquier
+   intento de asignarlo a mano. */
 const EQUIPMENT_STATUS_OPTIONS = [
   { value: 'OPERATIONAL', label: 'Operativo' },
-  { value: 'MAINTENANCE', label: 'En mantenimiento' },
   { value: 'OUT_OF_SERVICE', label: 'Fuera de servicio' },
 ];
+
+const AUTOMATIC_STATUS = 'MAINTENANCE';
 
 function emptyForm(defaultNodeId) {
   return {
@@ -32,6 +38,13 @@ function emptyForm(defaultNodeId) {
 
 export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved }) {
   const editing = !!equipment;
+  // El equipo esta bajo el estado automatico: se muestra de solo lectura y el
+  // formulario no lo toca (ver el payload y el campo Estado mas abajo).
+  const underMaintenance = editing && equipment.status === AUTOMATIC_STATUS;
+  // Unica transicion manual admitida durante una orden activa: OUT_OF_SERVICE
+  // (ver AutomaticStatusField.jsx). Volver a OPERATIONAL lo rechaza el
+  // backend con 409 mientras la orden siga en ejecucion.
+  const [markOutOfService, setMarkOutOfService] = useState(false);
 
   const { data: nodesData, loading: nodesLoading } = useAsync(() => networkNodeService.list(), []);
   const { data: providersData, loading: providersLoading } = useAsync(() => supportProviderService.list(), []);
@@ -86,7 +99,13 @@ export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved 
         name: v.name,
         category: v.category,
         serialNumber: v.serialNumber ? v.serialNumber : null,
-        status: v.status,
+        // Con el estado automatico activo el campo `status` NO viaja: el
+        // backend lo conserva, y editar nombre, categoria o proveedor de un
+        // equipo en mantenimiento sigue funcionando con normalidad. La
+        // excepcion es "Marcar fuera de servicio", pedido explicitamente.
+        ...(underMaintenance
+          ? (markOutOfService ? { status: 'OUT_OF_SERVICE' } : {})
+          : { status: v.status }),
         networkNodeId: v.networkNodeId,
         supportProviderId: v.supportProviderId || null,
       };
@@ -153,9 +172,18 @@ export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved 
           <Field label="Nodo" required error={fieldErrors.networkNodeId}>
             <Select value={v.networkNodeId} onChange={set('networkNodeId')} options={nodeOptions} error={fieldErrors.networkNodeId} />
           </Field>
-          <Field label="Estado" error={fieldErrors.status}>
-            <Select value={v.status} onChange={set('status')} options={EQUIPMENT_STATUS_OPTIONS} />
-          </Field>
+          {underMaintenance ? (
+            <AutomaticStatusField
+              kind="equipment"
+              resourceLabel="el equipo"
+              markedOutOfService={markOutOfService}
+              onToggle={setMarkOutOfService}
+            />
+          ) : (
+            <Field label="Estado" error={fieldErrors.status}>
+              <Select value={v.status} onChange={set('status')} options={EQUIPMENT_STATUS_OPTIONS} />
+            </Field>
+          )}
           <div className="nk-col-2">
             <Field label="Proveedor de soporte" error={fieldErrors.supportProviderId}>
               <Select value={v.supportProviderId} onChange={set('supportProviderId')} options={providerOptions} />

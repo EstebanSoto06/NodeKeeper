@@ -37,6 +37,16 @@ const createdMaintenanceIds = [];
 afterAll(async () => {
   const adminToken = await loginAs("admin@nodekeeper.local", adminPassword);
 
+  // Una orden IN_PROGRESS no puede eliminarse (dejaria su nodo/equipos en
+  // MAINTENANCE sin nadie que los liberase, ver deleteMaintenance). Las
+  // ordenes de prueba que quedaron en ejecucion se cancelan antes de limpiar.
+  if (createdMaintenanceIds.length > 0) {
+    await prisma.maintenance.updateMany({
+      where: { id: { in: createdMaintenanceIds }, status: "IN_PROGRESS" },
+      data: { status: "CANCELLED" },
+    });
+  }
+
   // Orden de limpieza: mantenimientos (via API, para tambien liberar
   // archivos de evidencia) -> equipos -> nodos. Con la foreign key ahora en
   // ON DELETE RESTRICT, un nodo/equipo con mantenimiento asociado no puede

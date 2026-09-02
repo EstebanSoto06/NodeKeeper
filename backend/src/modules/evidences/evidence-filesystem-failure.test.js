@@ -73,6 +73,15 @@ afterEach(() => {
 });
 
 afterAll(async () => {
+  // Una orden IN_PROGRESS no puede eliminarse (ver deleteMaintenance): las
+  // que quedaron en ejecucion se cancelan antes de limpiar.
+  if (createdMaintenanceIds.length > 0) {
+    await prisma.maintenance.updateMany({
+      where: { id: { in: createdMaintenanceIds }, status: "IN_PROGRESS" },
+      data: { status: "CANCELLED" },
+    });
+  }
+
   for (const maintenanceId of createdMaintenanceIds) {
     await request(app)
       .delete(`/api/maintenances/${maintenanceId}`)
@@ -104,6 +113,16 @@ async function createInProgressMaintenance() {
     .set("Authorization", `Bearer ${adminToken}`);
 
   return maintenanceId;
+}
+
+// Una orden IN_PROGRESS ya no puede eliminarse (ver deleteMaintenance): sus
+// recursos quedarian en MAINTENANCE sin nadie que los liberase. Las pruebas
+// que borran una orden CON evidencias -que solo pueden subirse mientras esta
+// IN_PROGRESS- la cierran primero, que es el flujo real.
+function completeMaintenance(maintenanceId) {
+  return request(app)
+    .post(`/api/maintenances/${maintenanceId}/complete`)
+    .set("Authorization", `Bearer ${adminToken}`);
 }
 
 async function uploadEvidence(maintenanceId) {
@@ -210,6 +229,7 @@ describe("Evidence filesystem/DB failure compensation", () => {
   it("a real filesystem error deleting a maintenance aborts before touching the DB", async () => {
     const maintenanceId = await createInProgressMaintenance();
     await uploadEvidence(maintenanceId);
+    await completeMaintenance(maintenanceId);
 
     vi.spyOn(fs, "rename").mockRejectedValueOnce(
       Object.assign(new Error("Simulated EACCES"), { code: "EACCES" }),
@@ -241,8 +261,12 @@ describe("Evidence filesystem/DB failure compensation", () => {
     const maintenanceId = await createInProgressMaintenance();
     await uploadEvidence(maintenanceId);
     await uploadEvidence(maintenanceId);
+    await completeMaintenance(maintenanceId);
 
-    vi.spyOn(prisma.maintenance, "delete").mockRejectedValueOnce(
+    // deleteMany (no delete): el borrado se condiciona por status para no
+    // poder eliminar una orden que se inicio entre la comprobacion y la
+    // escritura (ver deleteMaintenance).
+    vi.spyOn(prisma.maintenance, "deleteMany").mockRejectedValueOnce(
       new Error("Simulated DB failure"),
     );
 
