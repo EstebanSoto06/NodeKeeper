@@ -253,3 +253,82 @@ describe('EquipmentFormModal — marcar fuera de servicio durante un mantenimien
     );
   });
 });
+
+describe('EquipmentFormModal — reparto de los conflictos 409', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const NODE_CHANGE_MESSAGE =
+    'No se puede cambiar el equipo de nodo mientras tiene un mantenimiento en ejecución.';
+  const ACTIVE_MAINTENANCE_MESSAGE =
+    'No se puede marcar el equipo como Operativo mientras tiene un mantenimiento en ejecución.';
+
+  async function renderEditingEquipmentA() {
+    networkNodeService.list.mockResolvedValueOnce({ networkNodes: fixtureNodes });
+    supportProviderService.list.mockResolvedValueOnce({ supportProviders: [fixtureProviderA] });
+    const utils = render(
+      <EquipmentFormModal equipment={fixtureEquipmentA} onClose={vi.fn()} onSaved={vi.fn()} />,
+    );
+    await waitFor(() => expect(screen.getByPlaceholderText('Switch core')).toBeInTheDocument());
+    return utils;
+  }
+
+  it('un 409 de serie duplicada se pinta bajo el campo Numero de serie, sin callout general', async () => {
+    const user = userEvent.setup();
+    equipmentService.update.mockRejectedValueOnce(
+      makeApiError('Equipment serial number already exists', { status: 409 }),
+    );
+
+    await renderEditingEquipmentA();
+    await user.click(screen.getByText('Guardar equipo'));
+
+    const message = await screen.findByText('Equipment serial number already exists');
+    expect(message).toHaveClass('nk-field-error');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('el 409 por cambio de nodo durante un mantenimiento va al error general', async () => {
+    const user = userEvent.setup();
+    equipmentService.update.mockRejectedValueOnce(
+      makeApiError(NODE_CHANGE_MESSAGE, { status: 409 }),
+    );
+
+    const { container } = await renderEditingEquipmentA();
+    await user.click(screen.getByText('Guardar equipo'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(NODE_CHANGE_MESSAGE);
+    expect(container.querySelector('.nk-field-error')).toBeNull();
+  });
+
+  it('el 409 por volver a Operativo con mantenimiento activo va al error general', async () => {
+    const user = userEvent.setup();
+    equipmentService.update.mockRejectedValueOnce(
+      makeApiError(ACTIVE_MAINTENANCE_MESSAGE, { status: 409 }),
+    );
+
+    const { container } = await renderEditingEquipmentA();
+    await user.click(screen.getByText('Guardar equipo'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(ACTIVE_MAINTENANCE_MESSAGE);
+    expect(container.querySelector('.nk-field-error')).toBeNull();
+  });
+
+  it('el 409 por MAINTENANCE manual tampoco se atribuye al numero de serie', async () => {
+    const user = userEvent.setup();
+    equipmentService.update.mockRejectedValueOnce(
+      makeApiError(
+        'El estado En mantenimiento lo asigna el sistema al iniciar un mantenimiento y no puede establecerse manualmente.',
+        { status: 409 },
+      ),
+    );
+
+    const { container } = await renderEditingEquipmentA();
+    await user.click(screen.getByText('Guardar equipo'));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(container.querySelector('.nk-field-error')).toBeNull();
+  });
+});

@@ -227,3 +227,61 @@ describe('NodeFormModal — marcar fuera de servicio durante un mantenimiento', 
     );
   });
 });
+
+describe('NodeFormModal — reparto de los conflictos 409', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const ACTIVE_MAINTENANCE_MESSAGE =
+    'No se puede marcar el nodo como Disponible mientras tiene un mantenimiento en ejecución.';
+
+  it('un 409 de codigo duplicado se pinta bajo el campo Codigo, sin callout general', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockRejectedValueOnce(
+      makeApiError('Network node code already exists', { status: 409 }),
+    );
+
+    render(<NodeFormModal node={fixtureNodeAvailable} onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.click(screen.getByText('Guardar nodo'));
+
+    const message = await screen.findByText('Network node code already exists');
+    // El error de campo es un <span class="nk-field-error"> dentro del Field;
+    // el general es el callout con role="alert". Comprobar solo el texto no
+    // distinguiria uno de otro.
+    expect(message).toHaveClass('nk-field-error');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('un 409 de regla de mantenimiento se pinta como error general, NO bajo Codigo', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockRejectedValueOnce(
+      makeApiError(ACTIVE_MAINTENANCE_MESSAGE, { status: 409 }),
+    );
+
+    const { container } = render(
+      <NodeFormModal node={fixtureNodeAvailable} onClose={vi.fn()} onSaved={vi.fn()} />,
+    );
+    await user.click(screen.getByText('Guardar nodo'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(ACTIVE_MAINTENANCE_MESSAGE);
+    expect(container.querySelector('.nk-field-error')).toBeNull();
+  });
+
+  it('un conflicto de concurrencia tampoco se atribuye al campo Codigo', async () => {
+    const user = userEvent.setup();
+    networkNodeService.update.mockRejectedValueOnce(
+      makeApiError('Concurrent modification detected, please retry', { status: 409 }),
+    );
+
+    const { container } = render(
+      <NodeFormModal node={fixtureNodeAvailable} onClose={vi.fn()} onSaved={vi.fn()} />,
+    );
+    await user.click(screen.getByText('Guardar nodo'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Concurrent modification detected, please retry');
+    expect(container.querySelector('.nk-field-error')).toBeNull();
+  });
+});

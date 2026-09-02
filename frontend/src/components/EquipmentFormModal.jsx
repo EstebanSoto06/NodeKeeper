@@ -9,7 +9,12 @@ import { Field, TextInput, Select } from './Inputs.jsx';
 import { AutomaticStatusField } from './AutomaticStatusField.jsx';
 import { LoadingSkeleton } from './LoadingSkeleton.jsx';
 import { useAsync } from '../hooks/useAsync.js';
-import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
+import {
+  validateRequired,
+  fieldErrorsFrom,
+  conflictErrorsFrom,
+  DUPLICATE_EQUIPMENT_SERIAL_MESSAGE,
+} from '../utils/formValidation.js';
 import * as equipmentService from '../services/equipmentService.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 import * as supportProviderService from '../services/supportProviderService.js';
@@ -120,7 +125,15 @@ export function EquipmentFormModal({ equipment, defaultNodeId, onClose, onSaved 
       if (err.status === 400) {
         setFieldErrors(fieldErrorsFrom(err));
       } else if (err.status === 409) {
-        setFieldErrors({ serialNumber: err.message });
+        // Solo la duplicidad de serie pertenece a un campo. Los conflictos
+        // por mantenimiento activo (cambio de nodo, vuelta a Operativo,
+        // MAINTENANCE manual) o por concurrencia son del registro completo.
+        const conflict = conflictErrorsFrom(err, {
+          field: 'serialNumber',
+          duplicateMessage: DUPLICATE_EQUIPMENT_SERIAL_MESSAGE,
+        });
+        setFieldErrors(conflict.fieldErrors);
+        setFormError(conflict.formError);
       } else {
         setFormError(err.message || 'No se pudo guardar el equipo.');
       }

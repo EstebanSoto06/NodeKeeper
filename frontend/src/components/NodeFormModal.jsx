@@ -6,7 +6,12 @@ import { Modal } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
 import { AutomaticStatusField } from './AutomaticStatusField.jsx';
-import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
+import {
+  validateRequired,
+  fieldErrorsFrom,
+  conflictErrorsFrom,
+  DUPLICATE_NODE_CODE_MESSAGE,
+} from '../utils/formValidation.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 
 /* "En mantenimiento" NO esta entre las opciones: es un estado AUTOMATICO que
@@ -87,7 +92,15 @@ export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
       if (err.status === 400) {
         setFieldErrors(fieldErrorsFrom(err));
       } else if (err.status === 409) {
-        setFieldErrors({ code: err.message });
+        // Solo la duplicidad de codigo pertenece a un campo. El resto de
+        // conflictos (reglas de mantenimiento, concurrencia) son del
+        // registro completo y se muestran como error general del modal.
+        const conflict = conflictErrorsFrom(err, {
+          field: 'code',
+          duplicateMessage: DUPLICATE_NODE_CODE_MESSAGE,
+        });
+        setFieldErrors(conflict.fieldErrors);
+        setFormError(conflict.formError);
       } else {
         setFormError(err.message || 'No se pudo guardar el nodo.');
       }
