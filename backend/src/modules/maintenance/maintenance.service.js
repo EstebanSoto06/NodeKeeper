@@ -2,6 +2,10 @@ import { prisma } from "../../config/prisma.js";
 import { createHttpError } from "../../utils/http-error.js";
 import { runSerializableTransaction } from "../../utils/serializable-transaction.js";
 import {
+  activeMaintenancesAffectingEquipment,
+  activeMaintenancesAffectingNode,
+} from "../../utils/maintenance-status-rules.js";
+import {
   deleteEvidenceFromQuarantine,
   moveEvidenceToQuarantine,
   restoreEvidenceFromQuarantine,
@@ -212,6 +216,35 @@ const UPDATABLE_STATUSES = ["SCHEDULED", "IN_PROGRESS"];
 const CLOSED_MAINTENANCE_ERROR =
   "Only scheduled or in-progress maintenances can be updated";
 
+const IN_PROGRESS_TARGET_ERROR =
+  "The type, network node or equipment of an in-progress maintenance cannot be changed";
+
+// El "objetivo" de una orden: su tipo y el recurso al que apunta, ya
+// normalizado igual que lo deja prepareMaintenanceData (exactamente una de
+// las dos columnas poblada). Se compara en memoria, sin tocar la base de
+// datos, para poder decidir ANTES de cualquier lectura si la edicion es una
+// reasignacion.
+function maintenanceTargetOf({ type, networkNodeId, equipmentId }) {
+  return type === "PREVENTIVE"
+    ? { type, networkNodeId: networkNodeId ?? null, equipmentId: null }
+    : { type: "CORRECTIVE", networkNodeId: null, equipmentId: equipmentId ?? null };
+}
+
+function isSameMaintenanceTarget(a, b) {
+  return (
+    a.type === b.type &&
+    a.networkNodeId === b.networkNodeId &&
+    a.equipmentId === b.equipmentId
+  );
+}
+
+/* Una orden IN_PROGRESS ya puso en MAINTENANCE su nodo/equipos; reasignarla a
+   otro recurso dejaria al anterior en MAINTENANCE para siempre (nadie lo
+   liberaria al completar) y al nuevo sin marcar. En vez de resincronizar
+   origen y destino -que multiplicaria los caminos de escritura de estado y
+   las carreras posibles- se prohibe el cambio: el objetivo de una orden en
+   ejecucion es inmutable. El resto de campos (titulo, descripcion, fecha)
+   se siguen editando con normalidad, porque no afectan a ningun recurso. */
 export async function updateMaintenance(id, data) {
   // El estado se toma de la base de datos, nunca del cuerpo de la solicitud:
   // maintenanceSchema ni siquiera acepta `status`, asi que un cliente no
@@ -223,7 +256,24 @@ export async function updateMaintenance(id, data) {
     throw createHttpError(409, CLOSED_MAINTENANCE_ERROR);
   }
 
+  // Se evalua antes de prepareMaintenanceData (que lee la base de datos) para
+  // resolver la reasignacion sin trabajo inutil.
+  const targetChanged = !isSameMaintenanceTarget(
+    maintenanceTargetOf(data),
+    maintenanceTargetOf(current),
+  );
+
+  if (targetChanged && current.status === "IN_PROGRESS") {
+    throw createHttpError(409, IN_PROGRESS_TARGET_ERROR);
+  }
+
   const preparedData = await prepareMaintenanceData(prisma, data);
+
+  // Cuando la edicion reasigna el recurso, el UPDATE se restringe ademas a
+  // SCHEDULED: si entre la comprobacion de arriba y esta escritura otra
+  // solicitud inicio la orden, el WHERE deja de cumplirse y la reasignacion
+  // se rechaza en lugar de aplicarse sobre una orden ya en ejecucion.
+  const writableStatuses = targetChanged ? ["SCHEDULED"] : UPDATABLE_STATUSES;
 
   let result;
 
@@ -235,7 +285,7 @@ export async function updateMaintenance(id, data) {
     // colar una edicion sobre una orden ya cerrada -- PostgreSQL bloquea la
     // fila y la condicion deja de cumplirse.
     result = await prisma.maintenance.updateMany({
-      where: { id, status: { in: UPDATABLE_STATUSES } },
+      where: { id, status: { in: writableStatuses } },
       data: preparedData,
     });
   } catch (error) {
@@ -243,7 +293,17 @@ export async function updateMaintenance(id, data) {
   }
 
   if (result.count === 0) {
-    // Ninguna fila cambio: la orden se cerro entre la lectura y la escritura.
+    // Ninguna fila cambio: la orden se cerro entre la lectura y la escritura,
+    // o -si esta edicion reasignaba el recurso- se inicio.
+    const latest = await prisma.maintenance.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
+    if (targetChanged && latest?.status === "IN_PROGRESS") {
+      throw createHttpError(409, IN_PROGRESS_TARGET_ERROR);
+    }
+
     throw createHttpError(409, CLOSED_MAINTENANCE_ERROR);
   }
 
@@ -256,11 +316,26 @@ async function restoreQuarantinedEvidences(storedNames) {
   );
 }
 
+const IN_PROGRESS_DELETE_ERROR =
+  "An in-progress maintenance cannot be deleted";
+
 export async function deleteMaintenance(id) {
   const maintenance = await prisma.maintenance.findUnique({ where: { id } });
 
   if (!maintenance) {
     throw createHttpError(404, "Maintenance not found");
+  }
+
+  // Una orden en ejecucion tiene su nodo/equipos en MAINTENANCE y es ella
+  // quien los libera al completarse: borrarla los dejaria en ese estado sin
+  // nadie que pudiera devolverlos. Se rechaza en vez de liberar los recursos
+  // desde el DELETE, para que exista una sola via de salida de MAINTENANCE
+  // (completar la orden) y el historial no se pierda a medias.
+  //
+  // Se comprueba ANTES de mover ninguna evidencia a cuarentena: un 409 no
+  // puede tocar el filesystem.
+  if (maintenance.status === "IN_PROGRESS") {
+    throw createHttpError(409, IN_PROGRESS_DELETE_ERROR);
   }
 
   const evidences = await prisma.evidence.findMany({
@@ -293,11 +368,31 @@ export async function deleteMaintenance(id) {
     }
   }
 
+  // deleteMany condicionado por status (y no delete por id) para cerrar la
+  // carrera con un POST /start simultaneo: si la orden se inicio despues de
+  // la comprobacion de arriba, el WHERE ya no la encuentra y no se borra.
+  let deleted;
+
   try {
-    await prisma.maintenance.delete({ where: { id } });
+    deleted = await prisma.maintenance.deleteMany({
+      where: { id, status: { not: "IN_PROGRESS" } },
+    });
   } catch (error) {
     await restoreQuarantinedEvidences(movedStoredNames);
     throw error;
+  }
+
+  if (deleted.count === 0) {
+    await restoreQuarantinedEvidences(movedStoredNames);
+
+    const latest = await prisma.maintenance.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    throw latest
+      ? createHttpError(409, IN_PROGRESS_DELETE_ERROR)
+      : createHttpError(404, "Maintenance not found");
   }
 
   await Promise.all(
@@ -311,23 +406,265 @@ export async function deleteMaintenance(id) {
   );
 }
 
-export async function startMaintenance(id, userId) {
-  // Transicion atomica: solo cambia SCHEDULED -> IN_PROGRESS.
-  // El WHERE condicionado por id + status hace que dos solicitudes
-  // simultaneas no puedan iniciar el mismo mantenimiento dos veces:
-  // PostgreSQL bloquea la fila y la segunda ya no cumple el WHERE.
-  const result = await prisma.maintenance.updateMany({
-    where: { id, status: "SCHEDULED" },
-    data: {
-      status: "IN_PROGRESS",
-      startedAt: new Date(),
-      startedById: userId,
-    },
+/* ---------------------------------------------------------------------------
+   Sincronizacion del estado de NetworkNode / Equipment
+   ---------------------------------------------------------------------------
+
+   Que orden afecta a que recurso lo definen
+   activeMaintenancesAffectingNode/Equipment en
+   utils/maintenance-status-rules.js: esa definicion la comparten este modulo
+   (para poner y quitar MAINTENANCE) y los modulos network-nodes/equipment
+   (para rechazar los cambios manuales que la romperian), de modo que las tres
+   no puedan divergir.
+
+   Todas las escrituras automaticas de estado llevan el estado ESPERADO dentro
+   del WHERE (updateMany condicionado), nunca un update incondicional por id:
+
+     iniciar:   AVAILABLE / OPERATIONAL -> MAINTENANCE
+     completar: MAINTENANCE             -> AVAILABLE / OPERATIONAL
+
+   Esa condicion es lo que protege a OUT_OF_SERVICE. Un nodo o un equipo
+   marcado fuera de servicio lo esta por una razon de negocio ajena al
+   mantenimiento (se registra a mano con PUT /network-nodes/:id o
+   PUT /equipment/:id, la unica via existente para cambiar el estado): no
+   entra en MAINTENANCE al iniciar y, sobre todo, no puede salir a
+   AVAILABLE/OPERATIONAL al completar, porque nunca cumple el WHERE.
+
+   De ahi que AVAILABLE/OPERATIONAL sea SIEMPRE el estado correcto al
+   restaurar, sin necesidad de una columna que recuerde el estado previo:
+   como MAINTENANCE solo se escribe automaticamente partiendo de
+   AVAILABLE/OPERATIONAL, el estado anterior de toda fila puesta en
+   MAINTENANCE por un mantenimiento es exactamente ese, y el unico estado que
+   podria perderse (OUT_OF_SERVICE) queda excluido por el propio WHERE.
+
+   El razonamiento vale igual si el estado cambia a mano MIENTRAS el
+   mantenimiento corre: marcar OUT_OF_SERVICE un nodo que estaba en
+   MAINTENANCE hace que al completar la restauracion no lo toque. */
+
+async function markNodeUnderMaintenance(tx, networkNodeId) {
+  await tx.networkNode.updateMany({
+    where: { id: networkNodeId, status: "AVAILABLE" },
+    data: { status: "MAINTENANCE" },
+  });
+}
+
+async function markEquipmentUnderMaintenance(tx, where) {
+  await tx.equipment.updateMany({
+    where: { ...where, status: "OPERATIONAL" },
+    data: { status: "MAINTENANCE" },
+  });
+}
+
+// Resuelve el nodo padre del equipo de un correctivo. La foreign key
+// Maintenance.equipmentId -> Equipment (onDelete: Restrict, ver
+// schema.prisma) impide que el equipo desaparezca mientras exista el
+// mantenimiento, asi que en la practica siempre encuentra la fila; devolver
+// null en vez de asumirlo evita convertir un dato inconsistente heredado en
+// un 500 y deja la transicion del mantenimiento intacta.
+function findMaintenanceEquipment(tx, equipmentId) {
+  return tx.equipment.findUnique({
+    where: { id: equipmentId },
+    select: { id: true, networkNodeId: true },
+  });
+}
+
+async function applyStartToResources(tx, maintenance) {
+  if (maintenance.type === "PREVENTIVE") {
+    if (!maintenance.networkNodeId) {
+      return;
+    }
+
+    await markNodeUnderMaintenance(tx, maintenance.networkNodeId);
+    // Todos los equipos del nodo en una sola escritura: el preventivo
+    // interviene el nodo completo.
+    await markEquipmentUnderMaintenance(tx, {
+      networkNodeId: maintenance.networkNodeId,
+    });
+
+    return;
+  }
+
+  if (!maintenance.equipmentId) {
+    return;
+  }
+
+  const equipment = await findMaintenanceEquipment(tx, maintenance.equipmentId);
+
+  if (!equipment) {
+    return;
+  }
+
+  // Solo el equipo intervenido; sus hermanos del mismo nodo no se tocan.
+  await markEquipmentUnderMaintenance(tx, { id: equipment.id });
+  await markNodeUnderMaintenance(tx, equipment.networkNodeId);
+}
+
+/* Restauracion al completar. La regla es que un recurso solo vuelve a
+   AVAILABLE/OPERATIONAL cuando YA NO queda ningun otro mantenimiento
+   IN_PROGRESS que lo afecte: si dos ordenes tocan el mismo nodo y se cierra
+   una, el nodo sigue en MAINTENANCE hasta que se cierre la ultima.
+
+   Los conteos de abajo corren DESPUES de que la propia orden paso a
+   COMPLETED dentro de la misma transaccion, por lo que ella misma ya no
+   aparece entre los IN_PROGRESS y no hace falta excluirla por id. */
+
+async function restoreNodeIfFree(tx, networkNodeId) {
+  const activeCount = await tx.maintenance.count({
+    where: activeMaintenancesAffectingNode(networkNodeId),
   });
 
-  if (result.count === 0) {
-    // Ninguna fila cambio: distinguir inexistente (404) de conflicto (409).
-    await getMaintenanceById(id);
+  if (activeCount > 0) {
+    return;
+  }
+
+  await tx.networkNode.updateMany({
+    where: { id: networkNodeId, status: "MAINTENANCE" },
+    data: { status: "AVAILABLE" },
+  });
+}
+
+async function restoreEquipmentIfFree(tx, equipment) {
+  const activeCount = await tx.maintenance.count({
+    where: activeMaintenancesAffectingEquipment(equipment),
+  });
+
+  if (activeCount > 0) {
+    return;
+  }
+
+  await tx.equipment.updateMany({
+    where: { id: equipment.id, status: "MAINTENANCE" },
+    data: { status: "OPERATIONAL" },
+  });
+}
+
+// Restaura los equipos de un nodo tras cerrar un preventivo. No se resuelve
+// equipo por equipo (eso serian N consultas dependientes del tamano del
+// nodo): un preventivo IN_PROGRESS bloquea a todos por igual, y los
+// correctivos IN_PROGRESS bloquean unicamente a SU equipo, asi que basta
+// excluir esos equipos concretos del UPDATE.
+async function restoreNodeEquipmentIfFree(tx, networkNodeId) {
+  const activePreventiveCount = await tx.maintenance.count({
+    where: { status: "IN_PROGRESS", networkNodeId },
+  });
+
+  if (activePreventiveCount > 0) {
+    return;
+  }
+
+  const activeCorrectives = await tx.maintenance.findMany({
+    where: { status: "IN_PROGRESS", equipment: { networkNodeId } },
+    select: { equipmentId: true },
+  });
+
+  const busyEquipmentIds = activeCorrectives
+    .map((maintenance) => maintenance.equipmentId)
+    .filter(Boolean);
+
+  await tx.equipment.updateMany({
+    where: {
+      networkNodeId,
+      status: "MAINTENANCE",
+      // El filtro se omite cuando no hay equipos ocupados en vez de enviar
+      // `notIn: []`, cuyo significado depende de la version del cliente.
+      ...(busyEquipmentIds.length > 0
+        ? { id: { notIn: busyEquipmentIds } }
+        : {}),
+    },
+    data: { status: "OPERATIONAL" },
+  });
+}
+
+async function applyCompletionToResources(tx, maintenance) {
+  if (maintenance.type === "PREVENTIVE") {
+    if (!maintenance.networkNodeId) {
+      return;
+    }
+
+    await restoreNodeEquipmentIfFree(tx, maintenance.networkNodeId);
+    await restoreNodeIfFree(tx, maintenance.networkNodeId);
+
+    return;
+  }
+
+  if (!maintenance.equipmentId) {
+    return;
+  }
+
+  const equipment = await findMaintenanceEquipment(tx, maintenance.equipmentId);
+
+  if (!equipment) {
+    return;
+  }
+
+  await restoreEquipmentIfFree(tx, equipment);
+  await restoreNodeIfFree(tx, equipment.networkNodeId);
+}
+
+// Columnas minimas que necesita la sincronizacion de recursos.
+const maintenanceResourceSelect = {
+  id: true,
+  status: true,
+  type: true,
+  networkNodeId: true,
+  equipmentId: true,
+};
+
+// Iniciar un mantenimiento dejo de ser una unica escritura sobre Maintenance:
+// ahora tambien pone en MAINTENANCE el nodo y/o los equipos afectados, y todo
+// eso debe ocurrir o no ocurrir junto (no puede quedar la orden IN_PROGRESS
+// con el nodo AVAILABLE, ni al reves), por lo que pasa a una transaccion.
+//
+// La transaccion es Serializable, y no la de por defecto, por la misma razon
+// que completeMaintenance: esta funcion ESCRIBE Maintenance y luego ESCRIBE
+// NetworkNode/Equipment, mientras que completeMaintenance LEE Maintenance
+// (el conteo de IN_PROGRESS que decide si puede restaurar) y ESCRIBE esos
+// mismos recursos. Bajo READ COMMITTED ese cruce admite un intercalado real:
+// un "complete" que cuenta cero ordenes activas justo antes de que este
+// "start" confirme la suya termina devolviendo el nodo a AVAILABLE con un
+// mantenimiento ya IN_PROGRESS encima. PostgreSQL solo detecta y aborta ese
+// ciclo si AMBOS lados corren en Serializable, asi que iniciar tambien tiene
+// que hacerlo; runSerializableTransaction reintenta el conflicto.
+export async function startMaintenance(id, userId) {
+  const outcome = await runSerializableTransaction(async (tx) => {
+    // Transicion condicionada por id + status: dos solicitudes simultaneas no
+    // pueden iniciar el mismo mantenimiento dos veces, porque la segunda ya
+    // no cumple el WHERE (y ademas no llega a duplicar la sincronizacion de
+    // recursos, que queda dentro de esta misma rama).
+    const result = await tx.maintenance.updateMany({
+      where: { id, status: "SCHEDULED" },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        startedById: userId,
+      },
+    });
+
+    if (result.count === 0) {
+      // Ninguna fila cambio: distinguir inexistente (404) de conflicto (409).
+      const existing = await tx.maintenance.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      return existing ? "INVALID_STATE" : "NOT_FOUND";
+    }
+
+    const maintenance = await tx.maintenance.findUnique({
+      where: { id },
+      select: maintenanceResourceSelect,
+    });
+
+    await applyStartToResources(tx, maintenance);
+
+    return "STARTED";
+  });
+
+  if (outcome === "NOT_FOUND") {
+    throw createHttpError(404, "Maintenance not found");
+  }
+
+  if (outcome === "INVALID_STATE") {
     throw createHttpError(409, "Only scheduled maintenances can be started");
   }
 
@@ -351,10 +688,16 @@ export async function completeMaintenance(id, userId) {
   // COMPLETED con una tarea pendiente. PostgreSQL solo detecta y aborta ese
   // ciclo si AMBOS lados corren en Serializable (con READ COMMITTED, un lado
   // no participa en la deteccion y el ciclo puede colarse sin error).
+  //
+  // La restauracion del nodo/equipos se agrega DENTRO de esta misma
+  // transaccion, despues del UPDATE: la proteccion del checklist no cambia
+  // (sigue siendo el mismo conteo, en el mismo aislamiento, antes de la
+  // transicion) y ahora ademas es imposible que la orden quede COMPLETED sin
+  // que los recursos se hayan reevaluado, o al reves.
   const outcome = await runSerializableTransaction(async (tx) => {
     const maintenance = await tx.maintenance.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: maintenanceResourceSelect,
     });
 
     if (!maintenance) {
@@ -389,6 +732,11 @@ export async function completeMaintenance(id, userId) {
       // Perdio la carrera: otra solicitud concurrente ya cambio el estado.
       return "INVALID_STATE";
     }
+
+    // Despues del UPDATE a proposito: asi esta orden ya no cuenta como
+    // IN_PROGRESS y los conteos de restauracion solo ven a las DEMAS ordenes
+    // que siguen afectando al nodo o al equipo.
+    await applyCompletionToResources(tx, maintenance);
 
     return "COMPLETED";
   });

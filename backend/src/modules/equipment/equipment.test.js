@@ -71,6 +71,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Una orden IN_PROGRESS no puede eliminarse (dejaria su nodo/equipos en
+  // MAINTENANCE sin nadie que los liberase, ver deleteMaintenance). Las
+  // ordenes de prueba que quedaron en ejecucion se cancelan antes de limpiar.
+  if (createdMaintenanceIds.length > 0) {
+    await prisma.maintenance.updateMany({
+      where: { id: { in: createdMaintenanceIds }, status: "IN_PROGRESS" },
+      data: { status: "CANCELLED" },
+    });
+  }
+
   // Los mantenimientos creados en las pruebas de preservacion de historial
   // deben eliminarse ANTES que su equipo/nodo: con la foreign key ahora en
   // ON DELETE RESTRICT, el equipo/nodo no puede eliminarse mientras el

@@ -5,14 +5,26 @@ import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Button } from './Button.jsx';
 import { Field, TextInput, Select } from './Inputs.jsx';
-import { validateRequired, fieldErrorsFrom } from '../utils/formValidation.js';
+import { AutomaticStatusField } from './AutomaticStatusField.jsx';
+import {
+  validateRequired,
+  fieldErrorsFrom,
+  conflictErrorsFrom,
+  DUPLICATE_NODE_CODE_MESSAGE,
+} from '../utils/formValidation.js';
 import * as networkNodeService from '../services/networkNodeService.js';
 
+/* "En mantenimiento" NO esta entre las opciones: es un estado AUTOMATICO que
+   escribe el backend al iniciar un mantenimiento y retira al completarlo (ver
+   maintenance.service.js). PUT /network-nodes/:id rechaza con 409 cualquier
+   intento de asignarlo a mano, asi que ofrecerlo aqui solo produciria un
+   error. Los dos estados de abajo son los unicos que decide una persona. */
 const NODE_STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'Disponible' },
-  { value: 'MAINTENANCE', label: 'En mantenimiento' },
   { value: 'OUT_OF_SERVICE', label: 'Fuera de servicio' },
 ];
+
+const AUTOMATIC_STATUS = 'MAINTENANCE';
 
 const EMPTY = { code: '', name: '', location: '', status: 'AVAILABLE' };
 
@@ -22,6 +34,16 @@ export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
   // pages/Map.jsx): la latitud/longitud ya vienen fijadas por el click y se
   // muestran de solo lectura, en vez de pedirselas de nuevo al usuario.
   const fromMap = !editing && !!initialCoords;
+  // El nodo esta bajo el estado automatico: se muestra de solo lectura y el
+  // formulario no lo toca (ver el payload y el campo Estado mas abajo).
+  const underMaintenance = editing && node.status === AUTOMATIC_STATUS;
+  // Unica transicion manual admitida durante una orden activa: el backend
+  // acepta OUT_OF_SERVICE (tiene prioridad sobre MAINTENANCE) y rechaza con
+  // 409 cualquier vuelta a AVAILABLE. Se guarda como intencion y viaja en el
+  // PUT del formulario; `underMaintenance` sigue derivandose del estado
+  // PERSISTIDO, para que marcarla nunca haga aparecer el select con
+  // "Disponible" entre sus opciones.
+  const [markOutOfService, setMarkOutOfService] = useState(false);
   const [v, setV] = useState(node ? { ...EMPTY, ...node } : { ...EMPTY });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -47,7 +69,15 @@ export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
         code: v.code,
         name: v.name,
         location: v.location || null,
-        status: v.status,
+        // Con el estado automatico activo el campo `status` NO viaja: el
+        // backend lo conserva tal cual, y asi editar el nombre o la ubicacion
+        // de un nodo en mantenimiento nunca depende de reenviar un estado que
+        // el usuario no controla. La excepcion es haber pedido explicitamente
+        // "Marcar fuera de servicio", la unica transicion manual que el
+        // backend admite mientras la orden sigue en ejecucion.
+        ...(underMaintenance
+          ? (markOutOfService ? { status: 'OUT_OF_SERVICE' } : {})
+          : { status: v.status }),
         ...(fromMap ? { latitude: initialCoords.latitude, longitude: initialCoords.longitude } : {}),
       };
       let result;
@@ -62,7 +92,15 @@ export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
       if (err.status === 400) {
         setFieldErrors(fieldErrorsFrom(err));
       } else if (err.status === 409) {
-        setFieldErrors({ code: err.message });
+        // Solo la duplicidad de codigo pertenece a un campo. El resto de
+        // conflictos (reglas de mantenimiento, concurrencia) son del
+        // registro completo y se muestran como error general del modal.
+        const conflict = conflictErrorsFrom(err, {
+          field: 'code',
+          duplicateMessage: DUPLICATE_NODE_CODE_MESSAGE,
+        });
+        setFieldErrors(conflict.fieldErrors);
+        setFormError(conflict.formError);
       } else {
         setFormError(err.message || 'No se pudo guardar el nodo.');
       }
@@ -110,9 +148,18 @@ export function NodeFormModal({ node, initialCoords, onClose, onSaved }) {
             <TextInput value={v.location || ''} onChange={set('location')} placeholder="San Isidro de El General" error={fieldErrors.location} />
           </Field>
         </div>
-        <Field label="Estado" error={fieldErrors.status}>
-          <Select value={v.status} onChange={set('status')} options={NODE_STATUS_OPTIONS} />
-        </Field>
+        {underMaintenance ? (
+          <AutomaticStatusField
+            kind="node"
+            resourceLabel="el nodo"
+            markedOutOfService={markOutOfService}
+            onToggle={setMarkOutOfService}
+          />
+        ) : (
+          <Field label="Estado" error={fieldErrors.status}>
+            <Select value={v.status} onChange={set('status')} options={NODE_STATUS_OPTIONS} />
+          </Field>
+        )}
       </div>
     </Modal>
   );
